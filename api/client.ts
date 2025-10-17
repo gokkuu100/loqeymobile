@@ -131,14 +131,20 @@ class ApiClient {
       const url = `${this.baseURL}${endpoint}`;
       const headers = await this.buildHeaders(options.headers);
 
+      console.log(`🌐 API ${options.method || 'GET'} ${url}`);
+      if (options.body) {
+        console.log('📤 Request body:', JSON.parse(options.body as string));
+      }
+
       const response = await fetch(url, {
         ...options,
         headers,
       });
 
+      console.log(`📥 Response status: ${response.status}`);
       return this.handleResponse<T>(response);
     } catch (error) {
-      console.error('API request failed:', error);
+      console.error('❌ API request failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Network request failed',

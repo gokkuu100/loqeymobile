@@ -47,18 +47,18 @@ export interface AccessLinkResponse {
 export class LinkAPI {
   /**
    * Create a new access link
-   * POST /api/v1/links
+   * POST /api/v1/links/
    */
   static async createLink(data: CreateAccessLinkRequest): Promise<ApiResponse<AccessLinkResponse>> {
-    return apiClient.post<AccessLinkResponse>('/links', data);
+    return apiClient.post<AccessLinkResponse>('/links/', data);
   }
 
-  /**
-   * Get all access links for the current user
-   * GET /api/v1/links?device_id={deviceId}
+    /**
+   * Get all access links (optionally filter by device)
+   * GET /api/v1/links/
    */
   static async getLinks(deviceId?: string): Promise<ApiResponse<AccessLink[]>> {
-    const url = deviceId ? `/links?device_id=${deviceId}` : '/links';
+    const url = deviceId ? `/links/?device_id=${deviceId}` : '/links/';
     return apiClient.get<AccessLink[]>(url);
   }
 
@@ -145,6 +145,7 @@ export class LinkAPI {
 // Export convenience functions
 export const createLink = LinkAPI.createLink;
 export const getLinks = LinkAPI.getLinks;
+export const getDeviceLinks = LinkAPI.getLinks; // Alias for getLinks with deviceId
 export const getLink = LinkAPI.getLink;
 export const deleteLink = LinkAPI.deleteLink;
 export const revokeLink = LinkAPI.revokeLink;

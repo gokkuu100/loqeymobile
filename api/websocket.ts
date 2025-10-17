@@ -29,7 +29,9 @@ class WebSocketClient {
 
   constructor(baseUrl: string = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000') {
     // Convert HTTP URL to WS URL
-    this.url = baseUrl.replace(/^http/, 'ws');
+    // Remove /api/v1 suffix if present since WebSocket endpoints are at root
+    const cleanUrl = baseUrl.replace(/\/api\/v1$/, '');
+    this.url = cleanUrl.replace(/^http/, 'ws');
   }
 
   /**
@@ -37,8 +39,8 @@ class WebSocketClient {
    */
   async connect(endpoint: string): Promise<void> {
     try {
-      // Get authentication token
-      this.token = await AsyncStorage.getItem('access_token');
+      // Get authentication token (using same key as API client)
+      this.token = await AsyncStorage.getItem('auth_token');
       if (!this.token) {
         throw new Error('No authentication token found');
       }

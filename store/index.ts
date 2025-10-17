@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthAPI } from '../api/auth';
 import { DeviceAPI, Device, DeviceAssignRequest, DeviceAssignResponse } from '../api/devices';
 import { LinkAPI, AccessLink, CreateAccessLinkRequest, AccessLinkResponse } from '../api/links';
+import apiClient from '../api/client';
 
 // User interface
 export interface User {
@@ -104,9 +105,25 @@ export const useAppStore = create<AppStore>()(
       login: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
+          console.log('Attempting login for:', email);
           const response = await AuthAPI.login(email, password);
           
+          console.log('Login response:', { 
+            success: response.success, 
+            hasData: !!response.data,
+            error: response.error 
+          });
+          
           if (response.success && response.data) {
+            console.log('Login successful, setting user data');
+            console.log('🔑 Access token received:', response.data.access_token.substring(0, 20) + '...');
+            
+            // Store refresh token in AsyncStorage
+            if (response.data.refresh_token) {
+              await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
+              console.log('🔄 Refresh token stored');
+            }
+            
             set({
               authToken: response.data.access_token,
               user: response.data.user,
@@ -114,9 +131,15 @@ export const useAppStore = create<AppStore>()(
               isLoading: false,
             });
             
+            // Verify token is stored in both places
+            const storedToken = await (apiClient as any).getAuthToken();
+            console.log('✅ Token stored in AsyncStorage:', storedToken ? 'YES' : 'NO');
+            console.log('✅ Token in Zustand state:', get().authToken ? 'YES' : 'NO');
+            
             get().addNotification('success', 'Login successful!');
             
             // Load initial data
+            console.log('Loading devices and links...');
             await Promise.all([
               get().loadDevices(),
               get().loadLinks(),
@@ -124,11 +147,13 @@ export const useAppStore = create<AppStore>()(
             
             return true;
           } else {
+            console.error('Login failed:', response.error);
             set({ isLoading: false });
             get().addNotification('error', response.error || 'Login failed');
             return false;
           }
         } catch (error) {
+          console.error('Login exception:', error);
           set({ isLoading: false });
           get().addNotification('error', 'Network error. Please try again.');
           return false;
@@ -138,7 +163,9 @@ export const useAppStore = create<AppStore>()(
       register: async (data) => {
         set({ isLoading: true });
         try {
+          console.log('📝 Registering user:', { ...data, password: '***' });
           const response = await AuthAPI.register(data);
+          console.log('📝 Registration response:', response);
           
           if (response.success) {
             set({ isLoading: false });
@@ -146,11 +173,14 @@ export const useAppStore = create<AppStore>()(
             return true;
           } else {
             set({ isLoading: false });
-            get().addNotification('error', response.error || 'Registration failed');
+            const errorMsg = response.error || 'Registration failed';
+            console.error('❌ Registration failed:', errorMsg);
+            get().addNotification('error', errorMsg);
             return false;
           }
         } catch (error) {
           set({ isLoading: false });
+          console.error('❌ Registration error:', error);
           get().addNotification('error', 'Network error. Please try again.');
           return false;
         }
@@ -161,6 +191,14 @@ export const useAppStore = create<AppStore>()(
           await AuthAPI.logout();
         } catch (error) {
           console.error('Logout error:', error);
+        }
+        
+        // Clear refresh token
+        try {
+          await AsyncStorage.removeItem('refresh_token');
+          console.log('🔄 Refresh token cleared');
+        } catch (error) {
+          console.error('Error clearing refresh token:', error);
         }
         
         set({
@@ -194,9 +232,19 @@ export const useAppStore = create<AppStore>()(
       loadDevices: async () => {
         set({ devicesLoading: true });
         try {
+          console.log('📱 Loading devices...');
+          
+          // Check if token exists before making request
+          const storedToken = await (apiClient as any).getAuthToken();
+          const zustandToken = get().authToken;
+          console.log('🔑 Token check - AsyncStorage:', storedToken ? `${storedToken.substring(0, 20)}...` : 'MISSING!');
+          console.log('🔑 Token check - Zustand:', zustandToken ? `${zustandToken.substring(0, 20)}...` : 'MISSING!');
+          
           const response = await DeviceAPI.getDevices();
+          console.log('📱 Devices response:', response);
           
           if (response.success && response.data) {
+            console.log(`✅ Loaded ${response.data.length} devices`);
             set({ 
               devices: response.data,
               devicesLoading: false,
@@ -204,37 +252,55 @@ export const useAppStore = create<AppStore>()(
             
             // Set first device as selected if none selected
             if (!get().selectedDevice && response.data.length > 0) {
+              console.log('📌 Setting first device as selected:', response.data[0].name);
               set({ selectedDevice: response.data[0] });
             }
           } else {
-            set({ devicesLoading: false });
-            get().addNotification('error', response.error || 'Failed to load devices');
+            console.log('⚠️ No devices or error:', response.error);
+            set({ 
+              devices: [],
+              devicesLoading: false 
+            });
+            
+            // Only show notification if there's an actual error, not just empty devices
+            if (response.error && response.status !== 200) {
+              get().addNotification('error', response.error || 'Failed to load devices');
+            }
           }
         } catch (error) {
-          set({ devicesLoading: false });
-          console.error('Load devices error:', error);
+          console.error('❌ Load devices error:', error);
+          set({ 
+            devices: [],
+            devicesLoading: false 
+          });
+          get().addNotification('error', 'Failed to connect to server');
         }
       },
       
       assignDevice: async (request: DeviceAssignRequest) => {
         set({ isLoading: true });
         try {
+          console.log('📝 Assigning device:', request);
           const response = await DeviceAPI.assignDevice(request);
+          console.log('📝 Assign response:', response);
           
           if (response.success && response.data) {
             set({ isLoading: false });
             get().addNotification('success', 'Device assigned successfully!');
             
             // Reload devices
+            console.log('🔄 Reloading devices after assignment...');
             await get().loadDevices();
             return true;
           } else {
             set({ isLoading: false });
+            console.error('❌ Device assignment failed:', response.error);
             get().addNotification('error', response.error || 'Failed to assign device');
             return false;
           }
         } catch (error) {
           set({ isLoading: false });
+          console.error('❌ Device assignment error:', error);
           get().addNotification('error', 'Network error. Please try again.');
           return false;
         }
@@ -442,6 +508,12 @@ export const useAppStore = create<AppStore>()(
         authToken: state.authToken,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        // Restore token to apiClient when store rehydrates
+        if (state?.authToken) {
+          apiClient.setAuthToken(state.authToken);
+        }
+      },
     }
   )
 );

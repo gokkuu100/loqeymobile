@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Activity } from '@/store/types';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
@@ -17,7 +17,9 @@ export default function EventsScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const [filter, setFilter] = useState<'today' | 'week' | 'all'>('today');
   
-  const { activities } = useAppStore();
+  const { devices } = useAppStore();
+  // TODO: Add activities API and store integration
+  const activities: any[] = [];
   
   const getFilteredActivities = () => {
     const now = new Date();

@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Delivery } from '@/store/types';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
@@ -16,7 +16,9 @@ export default function DeliveriesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
-  const { deliveries } = useAppStore();
+  const { devices } = useAppStore();
+  // TODO: Add deliveries API and store integration
+  const deliveries: any[] = [];
   
   const upcomingDeliveries = deliveries.filter((delivery: Delivery) => delivery.status === 'pending');
   const pastDeliveries = deliveries.filter((delivery: Delivery) => delivery.status === 'delivered');

@@ -1,10 +1,11 @@
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Activity, Delivery } from '@/store/types';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     Alert,
     Dimensions,
@@ -25,25 +26,48 @@ export default function HomeScreen() {
   const router = useRouter();
   const [deviceSelectorVisible, setDeviceSelectorVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   const {
     user,
     devices,
-    currentDevice,
-    deliveries,
-    activities,
+    selectedDevice,
     isAuthenticated,
     isLoading,
-    setCurrentDevice,
-    toggleDeviceStatus,
+    setSelectedDevice,
+    unlockDevice,
+    loadDevices,
     logout,
-    initialize,
   } = useAppStore();
 
-  // Initialize the app on first load
+  // WebSocket is now managed at root level in _layout.tsx
+  // This prevents multiple instances and connection churn
+
+  // Update current time every 5 seconds to refresh "time ago" displays
   useEffect(() => {
-    initialize();
-  }, [initialize]);
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 5000); // 5 seconds for responsive updates
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Load devices on first mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDevices();
+    }
+  }, [isAuthenticated]);
+
+  // Reload devices whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated) {
+        console.log('🔄 Home screen focused - reloading devices');
+        loadDevices();
+      }
+    }, [isAuthenticated, loadDevices])
+  );
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -53,17 +77,17 @@ export default function HomeScreen() {
   };
 
   const handleLockToggle = async () => {
-    if (!currentDevice) return;
+    if (!selectedDevice) return;
     
     Alert.alert(
       'Device Control',
-      `Are you sure you want to ${currentDevice.status === 'locked' ? 'unlock' : 'lock'} ${currentDevice.name}?`,
+      `Are you sure you want to ${selectedDevice.lock_status === 'locked' ? 'unlock' : 'lock'} ${selectedDevice.name || 'this device'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Confirm', 
           onPress: async () => {
-            const success = await toggleDeviceStatus(currentDevice.id);
+            const success = await unlockDevice(selectedDevice.id);
             if (!success) {
               Alert.alert('Error', 'Failed to toggle device status. Please try again.');
             }
@@ -73,13 +97,12 @@ export default function HomeScreen() {
     );
   };
 
-  const upcomingDeliveries = deliveries.filter((delivery: Delivery) => delivery.status === 'pending');
-  const todayActivities = activities.filter((activity: Activity) => 
-    new Date(activity.timestamp).toDateString() === new Date().toDateString()
-  );
+  // Placeholder for deliveries and activities - to be implemented
+  const upcomingDeliveries: any[] = [];
+  const todayActivities: any[] = [];
 
   const handleAddDevice = () => {
-    Alert.alert('Add Device', 'Device addition feature coming soon!');
+    router.push('/assign-device');
   };
 
   const MenuModal = () => (
@@ -198,7 +221,7 @@ export default function HomeScreen() {
             {getGreeting()},
           </Text>
           <Text style={[styles.userName, { color: colors.text }]}>
-            {user.name}
+            {user?.first_name || 'User'}
           </Text>
         </View>
 
@@ -209,20 +232,83 @@ export default function HomeScreen() {
             onPress={() => setDeviceSelectorVisible(true)}
           >
             <Text style={[styles.selectorLabel, { color: colors.text }]}>
-              Current Device: {currentDevice?.name || 'None'}
+              Current Device: {selectedDevice?.name || 'None'}
             </Text>
             <Ionicons name="chevron-down" size={20} color={colors.tabIconDefault} />
           </TouchableOpacity>
         )}
 
         {/* Main Lock/Unlock Circle */}
-        {currentDevice && (
+        {selectedDevice && (
           <View style={styles.lockSection}>
+            {/* Device Info Card */}
+            <View style={[styles.deviceInfoCard, { backgroundColor: colors.card }]}>
+              <View style={styles.infoRow}>
+                {/* Battery */}
+                <View style={styles.infoItem}>
+                  <Ionicons 
+                    name={
+                      selectedDevice.battery_level && selectedDevice.battery_level > 75 ? 'battery-full' :
+                      selectedDevice.battery_level && selectedDevice.battery_level > 50 ? 'battery-half' :
+                      selectedDevice.battery_level && selectedDevice.battery_level > 25 ? 'battery-charging-outline' :
+                      'battery-dead'
+                    }
+                    size={20}
+                    color={
+                      selectedDevice.battery_level && selectedDevice.battery_level > 50 ? '#4CAF50' :
+                      selectedDevice.battery_level && selectedDevice.battery_level > 25 ? '#FFA726' :
+                      '#F44336'
+                    }
+                  />
+                  <Text style={[styles.infoValue, { color: colors.text }]}>
+                    {selectedDevice.battery_level !== undefined ? `${selectedDevice.battery_level}%` : '--'}
+                  </Text>
+                </View>
+
+                {/* Online Status */}
+                <View style={styles.infoItem}>
+                  <View style={[
+                    styles.statusDot,
+                    { backgroundColor: selectedDevice.is_online ? '#4CAF50' : '#9E9E9E' }
+                  ]} />
+                  <Text style={[styles.infoValue, { color: colors.text }]}>
+                    {selectedDevice.is_online ? 'Online' : 'Offline'}
+                  </Text>
+                </View>
+
+                {/* Last Seen */}
+                <View style={styles.infoItem}>
+                  <Ionicons 
+                    name="time-outline" 
+                    size={18} 
+                    color={colors.tabIconDefault}
+                  />
+                  <Text style={[styles.infoValue, { color: colors.tabIconDefault, fontSize: 12 }]}>
+                    {selectedDevice.last_heartbeat 
+                      ? (() => {
+                          const lastSeen = new Date(selectedDevice.last_heartbeat);
+                          const diffMs = currentTime.getTime() - lastSeen.getTime();
+                          const diffMins = Math.floor(diffMs / 60000);
+                          const diffHours = Math.floor(diffMins / 60);
+                          const diffDays = Math.floor(diffHours / 24);
+                          
+                          if (diffMins < 1) return 'Just now';
+                          if (diffMins < 60) return `${diffMins}m ago`;
+                          if (diffHours < 24) return `${diffHours}h ago`;
+                          return `${diffDays}d ago`;
+                        })()
+                      : 'Never'
+                    }
+                  </Text>
+                </View>
+              </View>
+            </View>
+
             <TouchableOpacity 
               style={[
                 styles.lockCircle,
                 { 
-                  borderColor: currentDevice.status === 'unlocked' 
+                  borderColor: selectedDevice.lock_status === 'unlocked' 
                     ? '#4CAF50' 
                     : '#9E9E9E',
                   opacity: isLoading ? 0.6 : 1
@@ -232,17 +318,17 @@ export default function HomeScreen() {
               disabled={isLoading}
             >
               <Ionicons 
-                name={currentDevice.status === 'unlocked' ? 'lock-open' : 'lock-closed'}
+                name={selectedDevice.lock_status === 'unlocked' ? 'lock-open' : 'lock-closed'}
                 size={48}
-                color={currentDevice.status === 'unlocked' ? '#4CAF50' : '#9E9E9E'}
+                color={selectedDevice.lock_status === 'unlocked' ? '#4CAF50' : '#9E9E9E'}
               />
               <Text style={[
                 styles.lockStatus,
                 { 
-                  color: currentDevice.status === 'unlocked' ? '#4CAF50' : '#9E9E9E' 
+                  color: selectedDevice.lock_status === 'unlocked' ? '#4CAF50' : '#9E9E9E' 
                 }
               ]}>
-                {currentDevice.status === 'unlocked' ? 'Unlocked' : 'Locked'}
+                {selectedDevice.lock_status === 'unlocked' ? 'Unlocked' : 'Locked'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -282,7 +368,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Control Section */}
-        {isAuthenticated && currentDevice && (
+        {isAuthenticated && selectedDevice && (
           <View style={styles.controlSection}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Device Control
@@ -338,10 +424,10 @@ export default function HomeScreen() {
                 key={device.id}
                 style={[
                   styles.deviceOption,
-                  currentDevice?.id === device.id && { backgroundColor: colors.tint + '20' }
+                  selectedDevice?.id === device.id && { backgroundColor: colors.tint + '20' }
                 ]}
                 onPress={() => {
-                  setCurrentDevice(device);
+                  setSelectedDevice(device);
                   setDeviceSelectorVisible(false);
                 }}
               >
@@ -350,10 +436,10 @@ export default function HomeScreen() {
                     {device.name}
                   </Text>
                   <Text style={[styles.deviceOptionLocation, { color: colors.tabIconDefault }]}>
-                    {device.location}
+                    {device.location_address || 'No location set'}
                   </Text>
                 </View>
-                {currentDevice?.id === device.id && (
+                {selectedDevice?.id === device.id && (
                   <Ionicons name="checkmark" size={20} color={colors.tint} />
                 )}
               </TouchableOpacity>
@@ -429,6 +515,37 @@ const styles = StyleSheet.create({
   lockSection: {
     alignItems: 'center',
     marginBottom: 30,
+  },
+  deviceInfoCard: {
+    width: '100%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   lockCircle: {
     width: 150,

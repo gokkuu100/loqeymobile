@@ -1,7 +1,8 @@
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     Alert,
@@ -15,11 +16,12 @@ import {
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const router = useRouter();
   
-  const { devices, removeDevice, updateDeviceName } = useAppStore();
+  const { devices, unlinkDevice, updateDevice } = useAppStore();
 
   const handleAddDevice = () => {
-    Alert.alert('Add Device', 'Device addition feature coming soon!');
+    router.push('/assign-device');
   };
 
   const handleEditDeviceName = (deviceId: string, currentName: string) => {
@@ -30,9 +32,9 @@ export default function SettingsScreen() {
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Save', 
-          onPress: (newName) => {
+          onPress: async (newName: string | undefined) => {
             if (newName && newName.trim()) {
-              updateDeviceName(deviceId, newName.trim());
+              await updateDevice(deviceId, { name: newName.trim() });
             }
           }
         },
@@ -51,7 +53,7 @@ export default function SettingsScreen() {
         { 
           text: 'Remove', 
           style: 'destructive',
-          onPress: () => removeDevice(deviceId)
+          onPress: async () => await unlinkDevice(deviceId)
         },
       ]
     );
@@ -101,20 +103,20 @@ export default function SettingsScreen() {
                 {device.name}
               </Text>
               <Text style={[styles.deviceLocation, { color: colors.tabIconDefault }]}>
-                {device.location}
+                {device.location_address || 'No location set'}
               </Text>
             </View>
             <View style={styles.deviceActions}>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => handleEditDeviceName(device.id, device.name)}
+                onPress={() => handleEditDeviceName(device.id, device.name || 'Device')}
               >
                 <Ionicons name="pencil-outline" size={20} color={colors.tint} />
               </TouchableOpacity>
               {devices.length > 1 && (
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => handleRemoveDevice(device.id, device.name)}
+                  onPress={() => handleRemoveDevice(device.id, device.name || 'this device')}
                 >
                   <Ionicons name="trash-outline" size={20} color="#F44336" />
                 </TouchableOpacity>

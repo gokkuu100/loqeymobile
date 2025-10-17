@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
@@ -32,14 +32,14 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <View style={[styles.avatar, { backgroundColor: colors.tint }]}>
           <Text style={styles.avatarText}>
-            {user.name.charAt(0).toUpperCase()}
+            {user?.first_name?.charAt(0).toUpperCase() || 'U'}
           </Text>
         </View>
         <Text style={[styles.userName, { color: colors.text }]}>
-          {user.name}
+          {user ? `${user.first_name} ${user.last_name}` : 'User'}
         </Text>
         <Text style={[styles.userEmail, { color: colors.tabIconDefault }]}>
-          {user.email}
+          {user?.email || ''}
         </Text>
       </View>
 

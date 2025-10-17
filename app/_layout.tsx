@@ -1,5 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useAppStore } from '@/store';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
@@ -7,6 +9,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const isAuthenticated = useAppStore(state => state.isAuthenticated);
+
+  // Initialize WebSocket at root level (only once)
+  useWebSocket({ enabled: isAuthenticated });
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

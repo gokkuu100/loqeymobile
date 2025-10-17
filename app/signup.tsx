@@ -82,24 +82,38 @@ export default function SignUpScreen() {
   };
 
   const handleSignUp = async () => {
+    console.log('🚀 Starting signup process...');
     if (validateForm()) {
-      const success = await register({
-        email: formData.email,
-        password: formData.password,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        phone_number: formData.phoneNumber || undefined,
-        resident_state: formData.state,
-        zip_code: formData.zipCode,
-      });
+      console.log('✅ Form validation passed');
+      try {
+        const success = await register({
+          email: formData.email,
+          password: formData.password,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone_number: formData.phoneNumber || undefined,
+          resident_state: formData.state,
+          zip_code: formData.zipCode,
+        });
 
-      if (success) {
-        Alert.alert(
-          'Success',
-          'Registration successful! Please sign in.',
-          [{ text: 'OK', onPress: () => router.replace('/signin') }]
-        );
+        console.log('📊 Registration result:', success);
+
+        if (success) {
+          Alert.alert(
+            'Success',
+            'Registration successful! Please sign in.',
+            [{ text: 'OK', onPress: () => router.replace('/signin') }]
+          );
+        } else {
+          Alert.alert('Error', 'Registration failed. Please try again.');
+        }
+      } catch (error) {
+        console.error('❌ Signup error:', error);
+        Alert.alert('Error', 'An unexpected error occurred.');
       }
+    } else {
+      console.log('❌ Form validation failed:', errors);
+      Alert.alert('Validation Error', 'Please fix the errors in the form.');
     }
   };
 
@@ -172,6 +186,9 @@ export default function SignUpScreen() {
           <View style={styles.form}>
             {renderInput('Email', 'email', 'Enter your email', 'email-address')}
             {renderInput('Password', 'password', 'Enter your password', 'default', true)}
+            <Text style={[styles.passwordHint, { color: colors.tabIconDefault }]}>
+              Password must be at least 8 characters with 1 uppercase letter and 1 digit
+            </Text>
             {renderInput('Confirm Password', 'confirmPassword', 'Confirm your password', 'default', true)}
             {renderInput('First Name', 'firstName', 'Enter your first name')}
             {renderInput('Last Name', 'lastName', 'Enter your last name')}
@@ -259,6 +276,12 @@ const styles = StyleSheet.create({
   },
   form: {
     marginBottom: 32,
+  },
+  passwordHint: {
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 12,
+    opacity: 0.7,
   },
   inputContainer: {
     marginBottom: 20,

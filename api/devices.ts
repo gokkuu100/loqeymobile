@@ -1,8 +1,11 @@
 import apiClient, { ApiResponse } from './client';
 
+export type DeviceType = 'smart_box' | 'smart_lock' | 'smart_container';
+
 export interface Device {
   id: string;
   serial_number: string;
+  device_type: DeviceType;
   model: string;
   name?: string;
   status: 'available' | 'assigned' | 'active' | 'maintenance' | 'decommissioned';
@@ -50,13 +53,11 @@ export interface DeviceCommandResponse {
  */
 export class DeviceAPI {
   /**
-   * Get all devices for current user
+   * Get all devices assigned to the current user
    */
   static async getDevices(): Promise<ApiResponse<Device[]>> {
-    return apiClient.get<Device[]>('/devices');
-  }
-
-  /**
+    return apiClient.get<Device[]>('/devices/');
+  }  /**
    * Assign a device to user using serial number + PIN
    */
   static async assignDevice(request: DeviceAssignRequest): Promise<ApiResponse<DeviceAssignResponse>> {
@@ -71,7 +72,7 @@ export class DeviceAPI {
   }
 
   /**
-   * Unlock device
+   * Unlock a device
    */
   static async unlockDevice(deviceId: string): Promise<ApiResponse<DeviceCommandResponse>> {
     return apiClient.post<DeviceCommandResponse>(`/devices/${deviceId}/unlock`);

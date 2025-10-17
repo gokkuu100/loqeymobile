@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -23,7 +23,8 @@ export default function UnlockScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
   const { code } = useLocalSearchParams<{ code: string }>();
-  const { unlockDeviceWithLink, isLoading } = useAppStore();
+  const { isLoading } = useAppStore();
+  // TODO: Implement unlockDeviceWithLink in store or use delivery API
 
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -49,6 +50,15 @@ export default function UnlockScreen() {
     }
 
     try {
+      // TODO: Implement delivery link unlock API
+      Alert.alert(
+        'Feature Coming Soon',
+        'Unlock via delivery link will be available soon.',
+        [
+          { text: 'OK', onPress: () => router.replace('/') }
+        ]
+      );
+      /*
       const success = await unlockDeviceWithLink(code, password);
       
       if (success) {
@@ -62,6 +72,7 @@ export default function UnlockScreen() {
       } else {
         setError('Invalid password or expired link');
       }
+      */
     } catch (error) {
       console.error('Unlock error:', error);
       setError('An error occurred. Please try again.');

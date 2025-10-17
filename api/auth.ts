@@ -68,6 +68,22 @@ export class AuthAPI {
   }
 
   /**
+   * Refresh access token using refresh token
+   */
+  static async refreshToken(refreshToken: string): Promise<ApiResponse<LoginResponse>> {
+    const response = await apiClient.post<LoginResponse>('/auth/refresh', {
+      refresh_token: refreshToken
+    });
+
+    if (response.success && response.data) {
+      // Update stored tokens
+      await apiClient.setAuthToken(response.data.access_token);
+    }
+
+    return response;
+  }
+
+  /**
    * Get current user profile
    */
   static async getProfile(): Promise<ApiResponse<UserData>> {

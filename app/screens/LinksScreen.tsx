@@ -1,8 +1,8 @@
 import { createLinkWithDuration, generateShareableURL, getDeviceLinks } from '@/api';
-import { Link } from '@/api/types';
+import { AccessLink } from '@/api/links';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
@@ -22,24 +22,24 @@ export default function LinksScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
-  const { currentDevice, isAuthenticated, isLoading } = useAppStore();
-  const [links, setLinks] = useState<Link[]>([]);
+  const { selectedDevice, isAuthenticated, isLoading } = useAppStore();
+  const [links, setLinks] = useState<AccessLink[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [duration, setDuration] = useState('24');
 
   useEffect(() => {
-    if (isAuthenticated && currentDevice) {
+    if (isAuthenticated && selectedDevice) {
       loadLinks();
     }
-  }, [isAuthenticated, currentDevice]);
+  }, [isAuthenticated, selectedDevice]);
 
   const loadLinks = async () => {
-    if (!currentDevice || !isAuthenticated) return;
+    if (!selectedDevice || !isAuthenticated) return;
 
     try {
-      const response = await getDeviceLinks(currentDevice.id);
+      const response = await getDeviceLinks(selectedDevice.id);
       if (response.success && response.data) {
         setLinks(response.data);
       } else {
@@ -57,12 +57,16 @@ export default function LinksScreen() {
   };
 
   const handleCreateLink = async () => {
-    if (!currentDevice || !isAuthenticated) return;
+    if (!selectedDevice || !isAuthenticated) return;
 
     setCreating(true);
     try {
       const durationHours = parseInt(duration) || 24;
-      const response = await createLinkWithDuration(currentDevice.id, durationHours);
+      const response = await createLinkWithDuration(
+        selectedDevice.id,
+        `Link created ${new Date().toLocaleDateString()}`,
+        durationHours
+      );
       
       if (response.success && response.data) {
         Alert.alert('Success', 'Access link created successfully!');
@@ -79,10 +83,10 @@ export default function LinksScreen() {
     }
   };
 
-  const handleShareLink = async (link: Link) => {
+  const handleShareLink = async (link: AccessLink) => {
     try {
-      const shareableURL = generateShareableURL(link.code);
-      const message = `Access Link for ${currentDevice?.name || 'Device'}:\n\n${shareableURL}\n\nPassword: ${link.password}\n\nValid until: ${new Date(link.active_until).toLocaleString()}`;
+      const shareableURL = generateShareableURL(link.link_token);
+      const message = `Access Link for ${selectedDevice?.name || 'Device'}:\n\n${shareableURL}\n\nValid until: ${new Date(link.expires_at).toLocaleString()}\nMax uses: ${link.max_uses}`;
       
       await Share.share({
         message,
@@ -94,8 +98,8 @@ export default function LinksScreen() {
     }
   };
 
-  const isLinkActive = (link: Link): boolean => {
-    return link.is_active && new Date(link.active_until) > new Date();
+  const isLinkActive = (link: AccessLink): boolean => {
+    return link.status === 'active' && new Date(link.expires_at) > new Date();
   };
 
   const formatDate = (dateString: string) => {
@@ -107,7 +111,7 @@ export default function LinksScreen() {
     });
   };
 
-  const renderLinkItem = ({ item }: { item: Link }) => {
+  const renderLinkItem = ({ item }: { item: AccessLink }) => {
     const active = isLinkActive(item);
     
     return (
@@ -115,10 +119,10 @@ export default function LinksScreen() {
         <View style={styles.linkHeader}>
           <View style={styles.linkInfo}>
             <Text style={[styles.linkCode, { color: colors.text }]}>
-              {item.code}
+              {item.link_token.substring(0, 8)}...{item.link_token.substring(item.link_token.length - 4)}
             </Text>
             <Text style={[styles.linkPassword, { color: colors.tabIconDefault }]}>
-              Password: {item.password}
+              {item.name || 'Unnamed Link'}
             </Text>
           </View>
           <View style={[
@@ -135,7 +139,7 @@ export default function LinksScreen() {
           <View style={styles.detailRow}>
             <Ionicons name="time-outline" size={16} color={colors.tabIconDefault} />
             <Text style={[styles.detailText, { color: colors.tabIconDefault }]}>
-              Valid until: {formatDate(item.active_until)}
+              Valid until: {formatDate(item.expires_at)}
             </Text>
           </View>
           <View style={styles.detailRow}>
@@ -237,7 +241,7 @@ export default function LinksScreen() {
     );
   }
 
-  if (!currentDevice) {
+  if (!selectedDevice) {
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
         <Ionicons name="cube-outline" size={64} color={colors.tabIconDefault} />
@@ -254,7 +258,7 @@ export default function LinksScreen() {
       
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Access Links for {currentDevice.name}
+          Access Links for {selectedDevice.name || 'Device'}
         </Text>
         <TouchableOpacity
           style={[styles.createButton, { backgroundColor: colors.tint }]}
