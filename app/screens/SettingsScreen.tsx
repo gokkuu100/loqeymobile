@@ -18,7 +18,10 @@ export default function SettingsScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
   
-  const { devices, unlinkDevice, updateDevice } = useAppStore();
+  // Use selectors to prevent unnecessary re-renders from WebSocket updates
+  const devices = useAppStore((state) => state.devices);
+  const unlinkDevice = useAppStore((state) => state.unlinkDevice);
+  const updateDevice = useAppStore((state) => state.updateDevice);
 
   const handleAddDevice = () => {
     router.push('/assign-device');

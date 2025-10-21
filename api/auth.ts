@@ -60,11 +60,34 @@ export class AuthAPI {
   }
 
   /**
-   * Logout user
+   * Logout user - clears local tokens immediately, backend notification is best-effort
    */
   static async logout(): Promise<void> {
-    await apiClient.post('/auth/logout');
+    // Clear tokens immediately (don't wait for backend)
     await apiClient.clearAuthToken();
+    
+    // Try to notify backend (but don't block on it)
+    try {
+      // Use a short timeout just for logout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      await fetch(`${(apiClient as any).baseURL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      }).catch(() => {
+        // Silently ignore - user is logged out locally anyway
+        console.log('Backend logout notification failed (ignored)');
+      });
+      
+      clearTimeout(timeoutId);
+    } catch (error) {
+      // Ignore errors - user is already logged out locally
+      console.log('Logout notification skipped:', error);
+    }
   }
 
   /**

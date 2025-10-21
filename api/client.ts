@@ -60,13 +60,14 @@ class ApiClient {
   }
 
   /**
-   * Remove authentication token
+   * Remove authentication token and refresh token
    */
   async clearAuthToken(): Promise<void> {
     try {
-      await AsyncStorage.removeItem('auth_token');
+      await AsyncStorage.multiRemove(['auth_token', 'refresh_token']);
+      console.log('✅ Auth tokens cleared');
     } catch (error) {
-      console.error('Failed to clear auth token:', error);
+      console.error('Failed to clear auth tokens:', error);
     }
   }
 
@@ -121,12 +122,14 @@ class ApiClient {
   }
 
   /**
-   * Generic request method
+   * Generic request method with timeout support
    */
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    const REQUEST_TIMEOUT = 30000; // 30 seconds timeout
+
     try {
       const url = `${this.baseURL}${endpoint}`;
       const headers = await this.buildHeaders(options.headers);
@@ -136,18 +139,51 @@ class ApiClient {
         console.log('📤 Request body:', JSON.parse(options.body as string));
       }
 
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
-      console.log(`📥 Response status: ${response.status}`);
-      return this.handleResponse<T>(response);
-    } catch (error) {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        console.log(`📥 Response status: ${response.status}`);
+        return this.handleResponse<T>(response);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        // Handle timeout specifically
+        if (fetchError.name === 'AbortError') {
+          console.error('⏱️ Request timeout after 30 seconds');
+          return {
+            success: false,
+            error: 'Request timeout. Please check your connection and try again.',
+          };
+        }
+        
+        throw fetchError;
+      }
+    } catch (error: any) {
       console.error('❌ API request failed:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Network request failed';
+      
+      if (error.message === 'Network request failed' || error.message.includes('fetch')) {
+        errorMessage = 'Cannot connect to server. Please check your internet connection.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Request timeout. Please try again.';
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Network request failed',
+        error: errorMessage,
       };
     }
   }

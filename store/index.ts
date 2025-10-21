@@ -78,6 +78,7 @@ interface AppStore {
   createLink: (data: CreateAccessLinkRequest) => Promise<AccessLinkResponse | null>;
   deleteLink: (linkId: string) => Promise<boolean>;
   revokeLink: (linkId: string) => Promise<boolean>;
+  updateLinkUsage: (linkId: string, updates: Partial<AccessLink>) => void;
   
   // UI Actions
   addNotification: (type: Notification['type'], message: string) => void;
@@ -105,17 +106,17 @@ export const useAppStore = create<AppStore>()(
       login: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
-          console.log('Attempting login for:', email);
+          console.log('🔐 Attempting login for:', email);
           const response = await AuthAPI.login(email, password);
           
-          console.log('Login response:', { 
+          console.log('📡 Login response:', { 
             success: response.success, 
             hasData: !!response.data,
             error: response.error 
           });
           
           if (response.success && response.data) {
-            console.log('Login successful, setting user data');
+            console.log('✅ Login successful, setting user data');
             console.log('🔑 Access token received:', response.data.access_token.substring(0, 20) + '...');
             
             // Store refresh token in AsyncStorage
@@ -128,7 +129,6 @@ export const useAppStore = create<AppStore>()(
               authToken: response.data.access_token,
               user: response.data.user,
               isAuthenticated: true,
-              isLoading: false,
             });
             
             // Verify token is stored in both places
@@ -136,26 +136,46 @@ export const useAppStore = create<AppStore>()(
             console.log('✅ Token stored in AsyncStorage:', storedToken ? 'YES' : 'NO');
             console.log('✅ Token in Zustand state:', get().authToken ? 'YES' : 'NO');
             
-            get().addNotification('success', 'Login successful!');
+            get().addNotification('success', 'Welcome back!');
             
-            // Load initial data
-            console.log('Loading devices and links...');
-            await Promise.all([
-              get().loadDevices(),
-              get().loadLinks(),
-            ]);
+            // Load initial data in background (don't wait)
+            console.log('🔄 Loading initial data...');
+            Promise.all([
+              get().loadDevices().catch(err => {
+                console.warn('Device load failed:', err);
+                // Don't fail login if device load fails
+              }),
+              get().loadLinks().catch(err => {
+                console.warn('Links load failed:', err);
+                // Don't fail login if links load fails
+              }),
+            ]).finally(() => {
+              set({ isLoading: false });
+              console.log('✅ Login complete!');
+            });
             
             return true;
           } else {
-            console.error('Login failed:', response.error);
+            console.error('❌ Login failed:', response.error);
             set({ isLoading: false });
-            get().addNotification('error', response.error || 'Login failed');
+            
+            // Provide specific error messages
+            const errorMsg = response.error || 'Invalid email or password';
+            get().addNotification('error', errorMsg);
             return false;
           }
-        } catch (error) {
-          console.error('Login exception:', error);
+        } catch (error: any) {
+          console.error('❌ Login exception:', error);
           set({ isLoading: false });
-          get().addNotification('error', 'Network error. Please try again.');
+          
+          // User-friendly error message
+          const errorMsg = error.message?.includes('timeout') 
+            ? 'Connection timeout. Please check your internet and try again.'
+            : error.message?.includes('connect') 
+            ? 'Cannot reach server. Please check your connection.'
+            : 'Login failed. Please try again.';
+            
+          get().addNotification('error', errorMsg);
           return false;
         }
       },
@@ -465,6 +485,18 @@ export const useAppStore = create<AppStore>()(
           get().addNotification('error', 'Network error. Please try again.');
           return false;
         }
+      },
+      
+      updateLinkUsage: (linkId: string, updates: Partial<AccessLink>) => {
+        const currentLinks = get().accessLinks;
+        const updatedLinks = currentLinks.map(link => {
+          if (link.id === linkId) {
+            return { ...link, ...updates };
+          }
+          return link;
+        });
+        set({ accessLinks: updatedLinks });
+        console.log(`[Store] Updated link ${linkId} usage:`, updates);
       },
       
       // UI Actions

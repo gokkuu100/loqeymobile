@@ -17,7 +17,8 @@ export default function EventsScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const [filter, setFilter] = useState<'today' | 'week' | 'all'>('today');
   
-  const { devices } = useAppStore();
+  // Use selector to prevent unnecessary re-renders from WebSocket updates
+  const devices = useAppStore((state) => state.devices);
   // TODO: Add activities API and store integration
   const activities: any[] = [];
   

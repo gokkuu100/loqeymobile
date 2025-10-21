@@ -16,7 +16,8 @@ export default function DeliveriesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
-  const { devices } = useAppStore();
+  // Use selector to prevent unnecessary re-renders from WebSocket updates
+  const devices = useAppStore((state) => state.devices);
   // TODO: Add deliveries API and store integration
   const deliveries: any[] = [];
   

@@ -83,6 +83,22 @@ class WebSocketService {
       // Update devices in store efficiently
       const currentDevices = useAppStore.getState().devices;
       
+      // Check if device exists and if values have actually changed
+      const targetDevice = currentDevices.find(d => d.id === deviceUpdate.device_id);
+      if (!targetDevice) return; // Device not found in store
+      
+      // Only update if values have actually changed
+      const hasChanges = 
+        targetDevice.battery_level !== deviceUpdate.battery_level ||
+        targetDevice.lock_status !== deviceUpdate.lock_status ||
+        targetDevice.is_online !== deviceUpdate.is_online ||
+        targetDevice.last_heartbeat !== deviceUpdate.last_heartbeat;
+      
+      if (!hasChanges) {
+        // No actual changes, skip the update to prevent re-renders
+        return;
+      }
+      
       const updatedDevices = currentDevices.map(device => {
         if (device.id === deviceUpdate.device_id) {
           return {
@@ -107,6 +123,26 @@ class WebSocketService {
         devices: updatedDevices,
         selectedDevice: updatedSelectedDevice || currentSelectedDevice,
       });
+      return;
+    }
+
+    // Handle link_used updates for real-time link status
+    if (message.type === 'user_update' && message.data?.type === 'link_used') {
+      const linkUpdate = message.data;
+      console.log('[WebSocketService] Link used:', linkUpdate.link_id);
+      
+      // Update the link in the store
+      useAppStore.getState().updateLinkUsage(linkUpdate.link_id, {
+        current_uses: linkUpdate.current_uses,
+        status: linkUpdate.status,
+        used_at: linkUpdate.used_at,
+      });
+      
+      // Show notification to user
+      useAppStore.getState().addNotification(
+        linkUpdate.success ? 'success' : 'warning',
+        `Access link used ${linkUpdate.success ? 'successfully' : 'unsuccessfully'}`
+      );
     }
   };
 

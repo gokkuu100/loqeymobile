@@ -4,33 +4,21 @@
  * Usage examples:
  * 
  * import { AuthAPI, DeviceAPI, LinkAPI } from '@/api';
- * import { login, getDevices, createLink } from '@/api';
+ * 
+ * // Use API classes for all operations:
+ * await AuthAPI.login(email, password);
+ * await DeviceAPI.getDevices();
+ * await LinkAPI.createLink(data);
  * 
  */
 
-// Export API classes
+// Export API classes (use these for all API calls)
 export { AuthAPI } from './auth';
 export { DeviceAPI } from './devices';
 export { LinkAPI } from './links';
 
-// Export convenience functions
-export {
-  isAuthenticated, login,
-  logout, test,
-  validateSession
-} from './auth';
-
-export {
-  deleteDevice, getDevice, getDevices, getDeviceStatus, lockDevice, triggerDeviceAction, unlockDevice, updateDevice
-} from './devices';
-
-export {
-  createLink,
-  createLinkWithDuration,
-  deleteLink, generateShareableURL, getActiveLinks, getAllLinks,
-  getDeviceLinks, getLink,
-  getLinkByCode, isLinkValid, updateLink
-} from './links';
+// Re-export types
+export type { LoginCredentials, RegisterData, UserData, LoginResponse } from './auth';
 
 // Export client and types
 export { apiClient, type ApiError, type ApiResponse } from './client';

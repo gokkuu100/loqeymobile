@@ -26,19 +26,19 @@ export default function HomeScreen() {
   const router = useRouter();
   const [deviceSelectorVisible, setDeviceSelectorVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [linkTypeModalVisible, setLinkTypeModalVisible] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  const {
-    user,
-    devices,
-    selectedDevice,
-    isAuthenticated,
-    isLoading,
-    setSelectedDevice,
-    unlockDevice,
-    loadDevices,
-    logout,
-  } = useAppStore();
+  // Use selectors to prevent unnecessary re-renders from WebSocket updates
+  const user = useAppStore((state) => state.user);
+  const devices = useAppStore((state) => state.devices);
+  const selectedDevice = useAppStore((state) => state.selectedDevice);
+  const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const setSelectedDevice = useAppStore((state) => state.setSelectedDevice);
+  const unlockDevice = useAppStore((state) => state.unlockDevice);
+  const loadDevices = useAppStore((state) => state.loadDevices);
+  const logout = useAppStore((state) => state.logout);
 
   // WebSocket is now managed at root level in _layout.tsx
   // This prevents multiple instances and connection churn
@@ -104,6 +104,71 @@ export default function HomeScreen() {
   const handleAddDevice = () => {
     router.push('/assign-device');
   };
+
+  const handleLinkTypeSelection = (linkType: 'tracking_number' | 'access_code') => {
+    setLinkTypeModalVisible(false);
+    router.push({
+      pathname: '/links' as any,
+      params: { createLinkType: linkType }
+    });
+  };
+
+  const LinkTypeModal = () => (
+    <Modal
+      visible={linkTypeModalVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setLinkTypeModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.linkTypeModal, { backgroundColor: colors.card }]}>
+          <Text style={[styles.linkModalTitle, { color: colors.text }]}>
+            Create Access Link
+          </Text>
+          <Text style={[styles.linkModalSubtitle, { color: colors.tabIconDefault }]}>
+            Choose the type of link to create:
+          </Text>
+
+          <TouchableOpacity 
+            style={[styles.linkTypeOption, { borderColor: colors.tabIconDefault + '30' }]}
+            onPress={() => handleLinkTypeSelection('tracking_number')}
+          >
+            <View style={styles.linkTypeContent}>
+              <Text style={[styles.linkTypeTitle, { color: colors.text }]}>
+                Tracking Number
+              </Text>
+              <Text style={[styles.linkTypeDescription, { color: colors.tabIconDefault }]}>
+                For deliveries with tracking codes from online shopping (Amazon, Alibaba, etc.)
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.linkTypeOption, { borderColor: colors.tabIconDefault + '30' }]}
+            onPress={() => handleLinkTypeSelection('access_code')}
+          >
+            <View style={styles.linkTypeContent}>
+              <Text style={[styles.linkTypeTitle, { color: colors.text }]}>
+                Access Code
+              </Text>
+              <Text style={[styles.linkTypeDescription, { color: colors.tabIconDefault }]}>
+                For courier deliveries where you share a secret code
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.linkModalCancelButton, { backgroundColor: colors.tabIconDefault + '20' }]}
+            onPress={() => setLinkTypeModalVisible(false)}
+          >
+            <Text style={[styles.linkModalCancelText, { color: colors.text }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   const MenuModal = () => (
     <Modal
@@ -194,6 +259,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinkTypeModal />
       <MenuModal />
       
       {/* Custom Header */}
@@ -375,7 +441,7 @@ export default function HomeScreen() {
             </Text>
             <TouchableOpacity 
               style={[styles.controlButton, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/links' as any)}
+              onPress={() => setLinkTypeModalVisible(true)}
             >
               <View style={styles.controlButtonContent}>
                 <Ionicons name="link-outline" size={24} color={colors.tint} />
@@ -710,5 +776,50 @@ const styles = StyleSheet.create({
   },
   controlButtonSubLabel: {
     fontSize: 14,
+  },
+  linkTypeModal: {
+    width: '85%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 24,
+    gap: 16,
+  },
+  linkModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  linkModalSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  linkTypeOption: {
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  linkTypeContent: {
+    gap: 8,
+  },
+  linkTypeTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  linkTypeDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  linkModalCancelButton: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  linkModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

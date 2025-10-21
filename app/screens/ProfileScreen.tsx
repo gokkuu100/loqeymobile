@@ -2,6 +2,7 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React from 'react';
 import {
     Alert,
@@ -10,13 +11,19 @@ import {
     Text,
     TouchableOpacity,
     View,
+    ActivityIndicator,
 } from 'react-native';
+import { webSocketService } from '@/services/WebSocketService';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
-  const { user } = useAppStore();
+  // Use selectors to prevent unnecessary re-renders from WebSocket updates
+  const user = useAppStore((state) => state.user);
+  const logout = useAppStore((state) => state.logout);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const [loggingOut, setLoggingOut] = React.useState(false);
 
   const handleEditProfile = () => {
     Alert.alert('Edit Profile', 'Profile editing feature coming soon!');
@@ -24,6 +31,47 @@ export default function ProfileScreen() {
 
   const handleChangePassword = () => {
     Alert.alert('Change Password', 'Password change feature coming soon!');
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            setLoggingOut(true);
+            try {
+              console.log('🚪 Signing out...');
+              
+              // Disconnect WebSocket
+              console.log('📡 Disconnecting WebSocket...');
+              webSocketService.disconnect();
+              
+              // Clear auth state
+              console.log('🔐 Clearing auth state...');
+              await logout();
+              
+              console.log('✅ Logout complete, navigating to signin...');
+              
+              // Navigate to sign in screen (replace entire stack)
+              router.replace('/signin');
+            } catch (error) {
+              console.error('❌ Logout error:', error);
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
+            } finally {
+              setLoggingOut(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -89,6 +137,27 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.tabIconDefault} />
         </TouchableOpacity>
       </View>
+
+      {/* Sign Out Section */}
+      <View style={styles.section}>
+        <TouchableOpacity 
+          style={[styles.signOutButton, { backgroundColor: '#ef4444' }]}
+          onPress={handleSignOut}
+          disabled={loggingOut}
+        >
+          {loggingOut ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <>
+              <Ionicons name="log-out-outline" size={24} color="white" />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        <Text style={[styles.versionText, { color: colors.tabIconDefault }]}>
+          Version 1.0.0
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -144,5 +213,29 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
     marginLeft: 12,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  signOutText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  versionText: {
+    textAlign: 'center',
+    fontSize: 12,
+    marginTop: 8,
   },
 });
