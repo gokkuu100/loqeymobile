@@ -26,11 +26,15 @@ export default function ProfileScreen() {
   const [loggingOut, setLoggingOut] = React.useState(false);
 
   const handleEditProfile = () => {
-    Alert.alert('Edit Profile', 'Profile editing feature coming soon!');
+    router.push('/screens/EditProfileScreen');
   };
 
   const handleChangePassword = () => {
-    Alert.alert('Change Password', 'Password change feature coming soon!');
+    router.push('/screens/ChangePasswordScreen');
+  };
+
+  const handlePrivacySettings = () => {
+    router.push('/screens/PrivacySettingsScreen');
   };
 
   const handleSignOut = () => {
@@ -117,22 +121,11 @@ export default function ProfileScreen() {
 
         <TouchableOpacity 
           style={[styles.menuItem, { backgroundColor: colors.card }]}
-          onPress={() => Alert.alert('Email Preferences', 'Email preferences coming soon!')}
-        >
-          <Ionicons name="mail-outline" size={24} color={colors.tint} />
-          <Text style={[styles.menuText, { color: colors.text }]}>
-            Email Preferences
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.tabIconDefault} />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: colors.card }]}
-          onPress={() => Alert.alert('Privacy Settings', 'Privacy settings coming soon!')}
+          onPress={handlePrivacySettings}
         >
           <Ionicons name="shield-outline" size={24} color={colors.tint} />
           <Text style={[styles.menuText, { color: colors.text }]}>
-            Privacy Settings
+            Privacy & Security
           </Text>
           <Ionicons name="chevron-forward" size={20} color={colors.tabIconDefault} />
         </TouchableOpacity>

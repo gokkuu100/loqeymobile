@@ -6,7 +6,7 @@ import { DeviceAPI, Device, DeviceAssignRequest, DeviceAssignResponse } from '..
 import { LinkAPI, AccessLink, CreateAccessLinkRequest, AccessLinkResponse } from '../api/links';
 import apiClient from '../api/client';
 
-// User interface
+// User interface (matches backend UserResponse)
 export interface User {
   id: string;
   email: string;
@@ -15,6 +15,10 @@ export interface User {
   phone_number?: string;
   resident_state: string;
   zip_code: string;
+  email_verified?: boolean;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
   is_admin?: boolean;
 }
 
@@ -59,6 +63,9 @@ interface AppStore {
   }) => Promise<boolean>;
   logout: () => Promise<void>;
   loadUserProfile: () => Promise<void>;
+  
+  // Profile Actions
+  updateUserProfile: (userData: User) => void;
   
   // Device Actions
   loadDevices: () => Promise<void>;
@@ -497,6 +504,37 @@ export const useAppStore = create<AppStore>()(
         });
         set({ accessLinks: updatedLinks });
         console.log(`[Store] Updated link ${linkId} usage:`, updates);
+      },
+      
+      // Profile Actions
+      updateUserProfile: (userData: User) => {
+        console.log('📝 Updating user profile in store');
+        console.log('📝 Received userData:', JSON.stringify(userData, null, 2));
+        console.log('📝 userData keys:', Object.keys(userData));
+        console.log('📝 userData.email:', userData.email);
+        console.log('📝 userData.first_name:', userData.first_name);
+        
+        const currentState = get();
+        console.log('📝 Current state before update:', {
+          hasUser: !!currentState.user,
+          hasToken: !!currentState.authToken,
+          isAuthenticated: currentState.isAuthenticated,
+          currentUserEmail: currentState.user?.email,
+        });
+        
+        set((state) => ({
+          ...state,
+          user: userData,
+        }));
+        
+        const newState = get();
+        console.log('✅ User profile updated in store');
+        console.log('✅ New state after update:', {
+          hasUser: !!newState.user,
+          hasToken: !!newState.authToken,
+          isAuthenticated: newState.isAuthenticated,
+          newUserEmail: newState.user?.email,
+        });
       },
       
       // UI Actions
