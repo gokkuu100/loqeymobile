@@ -32,6 +32,41 @@ export interface LoginResponse {
   user: UserData;
 }
 
+export interface LoginStatusResponse {
+  status: 'success' | 'incomplete_profile' | 'not_registered';
+  message: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  user?: UserData;
+  email?: string;
+}
+
+export interface SendVerificationRequest {
+  email: string;
+}
+
+export interface VerifyEmailRequest {
+  email: string;
+  code: string;
+}
+
+export interface VerifyEmailResponse {
+  message: string;
+  email_verified: boolean;
+}
+
+export interface CompleteProfileData {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone_number?: string;
+  resident_state: string;
+  zip_code: string;
+}
+
 /**
  * Authentication API functions
  */
@@ -133,5 +168,48 @@ export class AuthAPI {
   static async validateSession(): Promise<boolean> {
     const response = await this.getProfile();
     return response.success;
+  }
+
+  /**
+   * Send verification code to email
+   */
+  static async sendVerificationCode(email: string): Promise<ApiResponse<{message: string; email_sent: boolean}>> {
+    return apiClient.post('/auth/send-verification', { email });
+  }
+
+  /**
+   * Verify email with code
+   */
+  static async verifyEmail(email: string, code: string): Promise<ApiResponse<VerifyEmailResponse>> {
+    return apiClient.post<VerifyEmailResponse>('/auth/verify-email', { email, code });
+  }
+
+  /**
+   * Complete profile after email verification
+   */
+  static async completeProfile(data: CompleteProfileData): Promise<ApiResponse<LoginResponse>> {
+    const response = await apiClient.post<LoginResponse>('/auth/complete-profile', data);
+
+    if (response.success && response.data) {
+      await apiClient.setAuthToken(response.data.access_token);
+    }
+
+    return response;
+  }
+
+  /**
+   * Login with status check for incomplete profiles
+   */
+  static async loginWithStatus(email: string, password: string): Promise<ApiResponse<LoginStatusResponse>> {
+    const response = await apiClient.post<LoginStatusResponse>('/auth/login-status', {
+      email,
+      password,
+    });
+
+    if (response.success && response.data?.access_token) {
+      await apiClient.setAuthToken(response.data.access_token);
+    }
+
+    return response;
   }
 }

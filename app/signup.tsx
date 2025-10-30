@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useAppStore } from '@/store';
+import { AuthAPI } from '@/api/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -22,132 +22,47 @@ export default function SignUpScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const { register, isLoading } = useAppStore();
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    phoneNumber: '',
-    state: '',
-    zipCode: '',
-  });
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+  const validateEmail = () => {
+    if (!email.trim()) {
+      setError('Email is required');
+      return false;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      setError('Please enter a valid email');
+      return false;
     }
+    return true;
   };
 
-  const validateForm = () => {
-    const newErrors: {[key: string]: string} = {};
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
+  const handleSendVerification = async () => {
+    if (!validateEmail()) {
+      return;
     }
 
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
+    setIsLoading(true);
+    try {
+      const response = await AuthAPI.sendVerificationCode(email);
 
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
-    }
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    }
-    if (!formData.state.trim()) {
-      newErrors.state = 'State is required';
-    }
-    if (!formData.zipCode.trim()) {
-      newErrors.zipCode = 'ZIP code is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSignUp = async () => {
-    console.log('🚀 Starting signup process...');
-    if (validateForm()) {
-      console.log('✅ Form validation passed');
-      try {
-        const success = await register({
-          email: formData.email,
-          password: formData.password,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          phone_number: formData.phoneNumber || undefined,
-          resident_state: formData.state,
-          zip_code: formData.zipCode,
-        });
-
-        console.log('📊 Registration result:', success);
-
-        if (success) {
-          Alert.alert(
-            'Success',
-            'Registration successful! Please sign in.',
-            [{ text: 'OK', onPress: () => router.replace('/signin') }]
-          );
-        } else {
-          Alert.alert('Error', 'Registration failed. Please try again.');
-        }
-      } catch (error) {
-        console.error('❌ Signup error:', error);
-        Alert.alert('Error', 'An unexpected error occurred.');
+      if (response.success) {
+        // Navigate directly to verify email screen
+        router.replace({
+          pathname: '/verify-email',
+          params: { email }
+        } as any);
+      } else {
+        Alert.alert('Error', response.error || 'Failed to send verification code. Please try again.');
       }
-    } else {
-      console.log('❌ Form validation failed:', errors);
-      Alert.alert('Validation Error', 'Please fix the errors in the form.');
+    } catch (error) {
+      console.error('Send verification error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const renderInput = (
-    label: string,
-    field: keyof typeof formData,
-    placeholder: string,
-    keyboardType: 'default' | 'phone-pad' | 'numeric' | 'email-address' = 'default',
-    secureTextEntry: boolean = false
-  ) => (
-    <View style={styles.inputContainer}>
-      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
-      <TextInput
-        style={[
-          styles.input,
-          { 
-            backgroundColor: colors.card,
-            borderColor: errors[field] ? '#F44336' : colors.tabIconDefault + '40',
-            color: colors.text
-          }
-        ]}
-        placeholder={placeholder}
-        placeholderTextColor={colors.tabIconDefault}
-        value={formData[field]}
-        onChangeText={(value) => handleInputChange(field, value)}
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-        autoCapitalize={secureTextEntry ? 'none' : 'words'}
-      />
-      {errors[field] && (
-        <Text style={styles.errorText}>{errors[field]}</Text>
-      )}
-    </View>
-  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -174,37 +89,60 @@ export default function SignUpScreen() {
           {/* Logo Section */}
           <View style={styles.logoSection}>
             <View style={[styles.logoPlaceholder, { backgroundColor: colors.tint }]}>
-              <Ionicons name="lock-closed" size={32} color="white" />
+              <Ionicons name="mail" size={32} color="white" />
             </View>
             <Text style={[styles.logoText, { color: colors.text }]}>loqey</Text>
             <Text style={[styles.subtitle, { color: colors.tabIconDefault }]}>
-              Create your account
+              Start by verifying your email
             </Text>
           </View>
 
-          {/* Form */}
+          {/* Description */}
+          <View style={styles.description}>
+            <Text style={[styles.descriptionText, { color: colors.tabIconDefault }]}>
+              We'll send a verification code to your email to ensure it's really you.
+            </Text>
+          </View>
+
+          {/* Email Input */}
           <View style={styles.form}>
-            {renderInput('Email', 'email', 'Enter your email', 'email-address')}
-            {renderInput('Password', 'password', 'Enter your password', 'default', true)}
-            <Text style={[styles.passwordHint, { color: colors.tabIconDefault }]}>
-              Password must be at least 8 characters with 1 uppercase letter and 1 digit
-            </Text>
-            {renderInput('Confirm Password', 'confirmPassword', 'Confirm your password', 'default', true)}
-            {renderInput('First Name', 'firstName', 'Enter your first name')}
-            {renderInput('Last Name', 'lastName', 'Enter your last name')}
-            {renderInput('Phone Number (Optional)', 'phoneNumber', '(555) 123-4567', 'phone-pad')}
-            {renderInput('State', 'state', 'Enter your state')}
-            {renderInput('ZIP Code', 'zipCode', 'Enter your ZIP code', 'numeric')}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  { 
+                    backgroundColor: colors.card,
+                    borderColor: error ? '#F44336' : colors.tabIconDefault + '40',
+                    color: colors.text
+                  }
+                ]}
+                placeholder="Enter your email"
+                placeholderTextColor={colors.tabIconDefault}
+                value={email}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  setError('');
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {error && (
+                <Text style={styles.errorText}>{error}</Text>
+              )}
+            </View>
           </View>
 
-          {/* Sign Up Button */}
+          {/* Continue Button */}
           <View style={styles.buttonContainer}>
             <Button
-              title="Create Account"
-              onPress={handleSignUp}
+              title={isLoading ? "Sending..." : "Continue"}
+              onPress={handleSendVerification}
               variant="primary"
               size="large"
               style={styles.signUpButton}
+              disabled={isLoading}
             />
           </View>
 
@@ -274,14 +212,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  form: {
+  description: {
+    paddingHorizontal: 24,
     marginBottom: 32,
   },
-  passwordHint: {
-    fontSize: 12,
-    marginTop: -12,
-    marginBottom: 12,
-    opacity: 0.7,
+  descriptionText: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  form: {
+    marginBottom: 32,
   },
   inputContainer: {
     marginBottom: 20,

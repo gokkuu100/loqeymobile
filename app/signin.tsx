@@ -2,10 +2,12 @@ import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAppStore } from '@/store';
+import { AuthAPI } from '@/api/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    Alert,
     KeyboardAvoidingView,
     Platform,
     SafeAreaView,
@@ -16,12 +18,13 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SignInScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const { login, isLoading } = useAppStore();
+  const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -64,18 +67,71 @@ export default function SignInScreen() {
 
   const handleSignIn = async () => {
     if (validateForm()) {
+      setIsLoading(true);
       try {
-        const success = await login(formData.email, formData.password);
+        const response = await AuthAPI.loginWithStatus(formData.email, formData.password);
         
-        if (success) {
-          // Navigate to home screen on successful login
-          router.replace('/');
+        if (response.success && response.data) {
+          const { status, message, access_token, refresh_token, user, email } = response.data;
+
+          if (status === 'not_registered') {
+            // User not found - show message and redirect to signup
+            Alert.alert(
+              'Account Not Found',
+              message,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Sign Up', 
+                  onPress: () => router.push('/signup' as any)
+                }
+              ]
+            );
+          } else if (status === 'incomplete_profile') {
+            // Profile incomplete - redirect to complete profile
+            Alert.alert(
+              'Complete Your Profile',
+              message,
+              [
+                {
+                  text: 'Continue',
+                  onPress: () => router.push({
+                    pathname: '/complete-profile',
+                    params: { email: email || formData.email }
+                  } as any)
+                }
+              ]
+            );
+          } else if (status === 'success' && access_token && user) {
+            // Success - store tokens and navigate
+            if (refresh_token) {
+              await AsyncStorage.setItem('refresh_token', refresh_token);
+            }
+
+            // Update store
+            useAppStore.setState({
+              authToken: access_token,
+              user: user as any,
+              isAuthenticated: true,
+            });
+
+            // Load initial data
+            const { loadDevices, loadLinks } = useAppStore.getState();
+            Promise.all([
+              loadDevices().catch(err => console.warn('Device load failed:', err)),
+              loadLinks().catch(err => console.warn('Links load failed:', err)),
+            ]);
+
+            router.replace('/');
+          }
         } else {
-          setLoginError('Invalid email or password. Please try again.');
+          setLoginError(response.error || 'Invalid email or password. Please try again.');
         }
       } catch (error) {
         console.error('Login error:', error);
         setLoginError('An error occurred. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
     }
   };
