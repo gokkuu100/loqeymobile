@@ -221,17 +221,6 @@ export default function HomeScreen() {
             style={styles.menuItem}
             onPress={() => {
               setMenuVisible(false);
-              router.push('/signin' as any);
-            }}
-          >
-            <Ionicons name="log-in-outline" size={24} color={colors.text} />
-            <Text style={[styles.menuText, { color: colors.text }]}>Sign In</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => {
-              setMenuVisible(false);
               Alert.alert(
                 'Sign Out',
                 'Are you sure you want to sign out?',
