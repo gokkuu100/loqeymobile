@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import ToastContainer from '@/components/Toast';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -60,6 +61,7 @@ export default function RootLayout() {
           headerShown: false,
         }} />
       </Stack>
+      <ToastContainer />
       <StatusBar style="auto" />
     </GestureHandlerRootView>
   );

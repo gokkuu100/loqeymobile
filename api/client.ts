@@ -106,9 +106,11 @@ class ApiClient {
           status: response.status,
         };
       } else {
+        // FastAPI returns errors in 'detail' field, but also check for 'message' and 'error'
+        const errorMessage = data?.detail || data?.message || data?.error || `HTTP ${response.status}`;
         return {
           success: false,
-          error: data?.message || data?.error || `HTTP ${response.status}`,
+          error: errorMessage,
           status: response.status,
         };
       }

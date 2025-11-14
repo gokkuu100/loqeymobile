@@ -28,7 +28,7 @@ export default function NotFoundScreen() {
         />
         <ThemedText type="title">This screen does not exist.</ThemedText>
         <ThemedText type="default" style={styles.description}>
-          The screen you're looking for could not be found.
+          The screen you&apos;re looking for could not be found.
         </ThemedText>
         
         <TouchableOpacity 

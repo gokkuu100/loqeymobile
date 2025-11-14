@@ -35,9 +35,11 @@ export default function HomeScreen() {
   const selectedDevice = useAppStore((state) => state.selectedDevice);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const isLoading = useAppStore((state) => state.isLoading);
+  const linksStats = useAppStore((state) => state.linksStats);
   const setSelectedDevice = useAppStore((state) => state.setSelectedDevice);
   const unlockDevice = useAppStore((state) => state.unlockDevice);
   const loadDevices = useAppStore((state) => state.loadDevices);
+  const loadLinksStats = useAppStore((state) => state.loadLinksStats);
   const logout = useAppStore((state) => state.logout);
 
   // WebSocket is now managed at root level in _layout.tsx
@@ -56,17 +58,19 @@ export default function HomeScreen() {
   useEffect(() => {
     if (isAuthenticated) {
       loadDevices();
+      loadLinksStats();
     }
   }, [isAuthenticated]);
 
-  // Reload devices whenever screen comes into focus
+  // Reload devices and stats whenever screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated) {
-        console.log('🔄 Home screen focused - reloading devices');
+        console.log('🔄 Home screen focused - reloading devices and stats');
         loadDevices();
+        loadLinksStats();
       }
-    }, [isAuthenticated, loadDevices])
+    }, [isAuthenticated, loadDevices, loadLinksStats])
   );
 
   const getGreeting = () => {
@@ -97,12 +101,18 @@ export default function HomeScreen() {
     );
   };
 
-  // Placeholder for deliveries and activities - to be implemented
-  const upcomingDeliveries: any[] = [];
-  const todayActivities: any[] = [];
-
   const handleAddDevice = () => {
     router.push('/assign-device');
+  };
+
+  const handleViewActiveLinks = () => {
+    // Navigate to links screen filtered by active status
+    router.push('/links');
+  };
+
+  const handleViewDeliveryHistory = () => {
+    // Navigate to delivery history screen with filters
+    router.push('/screens/DeliveryHistoryScreen' as any);
   };
 
   const handleLinkTypeSelection = (linkType: 'tracking_number' | 'access_code') => {
@@ -280,6 +290,28 @@ export default function HomeScreen() {
           </Text>
         </View>
 
+        {/* No Devices Message */}
+        {devices.length === 0 && (
+          <View style={[styles.noDevicesContainer, { backgroundColor: colors.card }]}>
+            <Ionicons name="cube-outline" size={64} color={colors.tabIconDefault} style={styles.noDevicesIcon} />
+            <Text style={[styles.noDevicesTitle, { color: colors.text }]}>
+              No devices added
+            </Text>
+            <Text style={[styles.noDevicesSubtitle, { color: colors.tabIconDefault }]}>
+              Add a device to start managing your smart lockbox
+            </Text>
+            <TouchableOpacity 
+              style={[styles.addDeviceButton, { backgroundColor: colors.tint }]}
+              onPress={handleAddDevice}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="white" />
+              <Text style={styles.addDeviceButtonText}>
+                Add Device
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Device Selector */}
         {devices.length > 1 && (
           <TouchableOpacity 
@@ -293,8 +325,8 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Main Lock/Unlock Circle */}
-        {selectedDevice && (
+        {/* Main Lock/Unlock Circle - Only show when devices exist */}
+        {devices.length > 0 && selectedDevice && (
           <View style={styles.lockSection}>
             {/* Device Info Card */}
             <View style={[styles.deviceInfoCard, { backgroundColor: colors.card }]}>
@@ -389,31 +421,32 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Quick Action Buttons */}
+        {/* Quick Action Buttons - Only show when devices exist */}
+        {devices.length > 0 && (
         <View style={styles.actionButtons}>
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: colors.card }]}
-            onPress={() => router.push('/deliveries')}
+            onPress={handleViewActiveLinks}
           >
             <View style={styles.actionButtonContent}>
-              <Ionicons name="cube-outline" size={24} color={colors.tint} />
+              <Ionicons name="link-outline" size={24} color={colors.tint} />
               <Text style={[styles.actionButtonLabel, { color: colors.text }]}>
-                {upcomingDeliveries.length} upcoming
+                {linksStats?.active_links || 0} active
               </Text>
               <Text style={[styles.actionButtonSubLabel, { color: colors.tabIconDefault }]}>
-                deliveries
+                delivery links
               </Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: colors.card }]}
-            onPress={() => router.push('/events')}
+            onPress={handleViewDeliveryHistory}
           >
             <View style={styles.actionButtonContent}>
               <Ionicons name="time-outline" size={24} color={colors.tint} />
               <Text style={[styles.actionButtonLabel, { color: colors.text }]}>
-                {todayActivities.length} events
+                {linksStats?.deliveries_today || 0} events
               </Text>
               <Text style={[styles.actionButtonSubLabel, { color: colors.tabIconDefault }]}>
                 recorded today
@@ -421,9 +454,10 @@ export default function HomeScreen() {
             </View>
           </TouchableOpacity>
         </View>
+        )}
 
         {/* Control Section */}
-        {isAuthenticated && selectedDevice && (
+        {devices.length > 0 && isAuthenticated && selectedDevice && (
           <View style={styles.controlSection}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Device Control
@@ -448,7 +482,8 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Add Device Button */}
+        {/* Add Device Button - Only show when devices exist */}
+        {devices.length > 0 && (
         <View style={styles.addButtonContainer}>
           <TouchableOpacity 
             style={[styles.addButton, { backgroundColor: colors.tint }]}
@@ -457,6 +492,7 @@ export default function HomeScreen() {
             <Ionicons name="add" size={24} color="white" />
           </TouchableOpacity>
         </View>
+        )}
       </ScrollView>
 
       {/* Device Selector Modal */}
@@ -808,6 +844,47 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   linkModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  noDevicesContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    borderRadius: 16,
+    marginVertical: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  noDevicesIcon: {
+    marginBottom: 16,
+    opacity: 0.5,
+  },
+  noDevicesTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noDevicesSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  addDeviceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  addDeviceButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },

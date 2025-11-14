@@ -251,6 +251,13 @@ export default function LinksScreen() {
     );
   }, [loadLinks]);
 
+  const handleViewLinkDetails = useCallback((link: AccessLink) => {
+    router.push({
+      pathname: '/link-detail',
+      params: { id: link.id }
+    });
+  }, [router]);
+
   const isLinkActive = (link: AccessLink): boolean => {
     return link.status === 'active' && new Date(link.expires_at) > new Date();
   };
@@ -342,6 +349,13 @@ export default function LinksScreen() {
         </View>
 
         <View style={styles.linkActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#6366F1' }]}
+            onPress={() => handleViewLinkDetails(item)}
+          >
+            <Ionicons name="information-circle-outline" size={18} color="white" />
+            <Text style={styles.actionButtonText}>Details</Text>
+          </TouchableOpacity>
           {active && (
             <>
               <TouchableOpacity
@@ -369,7 +383,7 @@ export default function LinksScreen() {
         </View>
       </View>
     );
-  }, [colors, handleShareLink, handleCopyLink, handleRevokeLink]);
+  }, [colors, handleShareLink, handleCopyLink, handleRevokeLink, handleViewLinkDetails]);
 
   // Memoize colors to prevent re-renders
   const cardBackgroundColor = useMemo(() => colors.card, [colors.card]);

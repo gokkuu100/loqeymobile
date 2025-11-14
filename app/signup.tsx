@@ -100,7 +100,7 @@ export default function SignUpScreen() {
           {/* Description */}
           <View style={styles.description}>
             <Text style={[styles.descriptionText, { color: colors.tabIconDefault }]}>
-              We'll send a verification code to your email to ensure it's really you.
+              We&apos;ll send a verification code to your email to ensure it&apos;s really you.
             </Text>
           </View>
 

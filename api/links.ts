@@ -50,6 +50,56 @@ export interface AccessLinkResponse {
   link_url: string;
 }
 
+export interface DeliveryRecord {
+  id: string;
+  tracking_number?: string;
+  code_verified: boolean;
+  delivery_person_name?: string;
+  delivery_person_id?: string;
+  courier_company?: string;
+  delivery_person_phone?: string;
+  attempted_at?: string;
+  completed_at?: string;
+  device_unlock_successful: boolean;
+  delivery_notes?: string;
+  device_name?: string;
+  device_serial?: string;
+}
+
+export interface PaginationInfo {
+  skip: number;
+  limit: number;
+  total: number;
+  has_more: boolean;
+}
+
+export interface LinkDeliveriesResponse {
+  link_id: string;
+  link_name?: string;
+  link_type: LinkType;
+  tracking_number?: string;
+  status: LinkStatus;
+  expires_at: string;
+  max_uses: number;
+  current_uses: number;
+  device_name?: string;
+  total_deliveries: number;
+  deliveries: DeliveryRecord[];
+  pagination: PaginationInfo;
+}
+
+export interface LinksStatsResponse {
+  active_links: number;
+  used_expired_links: number;
+  deliveries_today: number;
+  total_deliveries: number;
+}
+
+export interface AllDeliveriesResponse {
+  deliveries: DeliveryRecord[];
+  pagination: PaginationInfo;
+}
+
 /**
  * Access Link API functions
  */
@@ -93,6 +143,47 @@ export class LinkAPI {
    */
   static async revokeLink(linkId: string): Promise<ApiResponse<{ message: string }>> {
     return apiClient.post<{ message: string }>(`/links/${linkId}/revoke`);
+  }
+
+  /**
+   * Get links and delivery statistics
+   * GET /api/v1/links/stats/summary
+   */
+  static async getStats(): Promise<ApiResponse<LinksStatsResponse>> {
+    return apiClient.get<LinksStatsResponse>('/links/stats/summary');
+  }
+
+  /**
+   * Get delivery records for a specific link with pagination
+   * GET /api/v1/links/{link_id}/deliveries
+   * @param linkId - The access link ID
+   * @param skip - Number of records to skip (default: 0)
+   * @param limit - Number of records to return (default: 10, max: 50)
+   */
+  static async getLinkDeliveries(
+    linkId: string, 
+    skip: number = 0, 
+    limit: number = 10
+  ): Promise<ApiResponse<LinkDeliveriesResponse>> {
+    return apiClient.get<LinkDeliveriesResponse>(
+      `/links/${linkId}/deliveries?skip=${skip}&limit=${limit}`
+    );
+  }
+
+  /**
+   * Get ALL delivery records for the current user across all links
+   * GET /api/v1/links/deliveries/all
+   * Much more efficient than fetching deliveries per link
+   * @param skip - Number of records to skip (default: 0)
+   * @param limit - Number of records to return (default: 50, max: 200)
+   */
+  static async getAllDeliveries(
+    skip: number = 0,
+    limit: number = 50
+  ): Promise<ApiResponse<AllDeliveriesResponse>> {
+    return apiClient.get<AllDeliveriesResponse>(
+      `/links/deliveries/all?skip=${skip}&limit=${limit}`
+    );
   }
 
   /**
@@ -221,3 +312,6 @@ export const isLinkValid = LinkAPI.isLinkValid;
 export const generateShareableURL = LinkAPI.generateShareableURL;
 export const formatTrackingInstructions = LinkAPI.formatTrackingInstructions;
 export const formatAccessCodeInstructions = LinkAPI.formatAccessCodeInstructions;
+export const getStats = LinkAPI.getStats;
+export const getLinkDeliveries = LinkAPI.getLinkDeliveries;
+export const getAllDeliveries = LinkAPI.getAllDeliveries;

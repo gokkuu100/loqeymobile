@@ -28,7 +28,7 @@ export default function CompleteProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const email = params.email as string;
-  const { updateUserProfile } = useAppStore();
+  useAppStore();
 
   const [formData, setFormData] = useState({
     password: '',
@@ -164,7 +164,7 @@ export default function CompleteProfileScreen() {
           onChangeText={(value) => handleInputChange(field, value)}
           keyboardType={keyboardType}
           secureTextEntry={secureTextEntry && !passwordVisible}
-          autoCapitalize={secureTextEntry ? 'none' : field === 'email' ? 'none' : 'words'}
+          autoCapitalize={secureTextEntry ? 'none' : 'words'}
           autoCorrect={false}
         />
         {showPasswordToggle && (
@@ -216,7 +216,7 @@ export default function CompleteProfileScreen() {
             </View>
             <Text style={[styles.logoText, { color: colors.text }]}>loqey</Text>
             <Text style={[styles.subtitle, { color: colors.tabIconDefault }]}>
-              Let's complete your profile
+              Let&apos;s complete your profile
             </Text>
           </View>
 

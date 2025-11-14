@@ -75,17 +75,29 @@ class WebSocketService {
       return;
     }
 
-    if (message.type === 'device_update' || message.type === 'user_update') {
+    // Handle device updates - can come as direct device_update or nested in user_update
+    if (message.type === 'device_update' || 
+        (message.type === 'user_update' && message.data?.type === 'device_update')) {
+      
       if (!message.data) return;
 
       const deviceUpdate = message.data;
+      
+      // Ensure we have a device_id
+      if (!deviceUpdate.device_id) {
+        console.warn('[WebSocketService] Device update missing device_id');
+        return;
+      }
       
       // Update devices in store efficiently
       const currentDevices = useAppStore.getState().devices;
       
       // Check if device exists and if values have actually changed
       const targetDevice = currentDevices.find(d => d.id === deviceUpdate.device_id);
-      if (!targetDevice) return; // Device not found in store
+      if (!targetDevice) {
+        console.warn('[WebSocketService] Device not found in store:', deviceUpdate.device_id);
+        return; // Device not found in store
+      }
       
       // Only update if values have actually changed
       const hasChanges = 
@@ -98,6 +110,8 @@ class WebSocketService {
         // No actual changes, skip the update to prevent re-renders
         return;
       }
+      
+      console.log('[WebSocketService] Updating device:', deviceUpdate.device_id);
       
       const updatedDevices = currentDevices.map(device => {
         if (device.id === deviceUpdate.device_id) {

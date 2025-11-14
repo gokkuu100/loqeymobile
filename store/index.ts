@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthAPI } from '../api/auth';
 import { DeviceAPI, Device, DeviceAssignRequest, DeviceAssignResponse } from '../api/devices';
-import { LinkAPI, AccessLink, CreateAccessLinkRequest, AccessLinkResponse } from '../api/links';
+import { LinkAPI, AccessLink, CreateAccessLinkRequest, AccessLinkResponse, LinksStatsResponse } from '../api/links';
 import apiClient from '../api/client';
 
 // User interface (matches backend UserResponse)
@@ -45,6 +45,7 @@ interface AppStore {
   // Links State
   accessLinks: AccessLink[];
   linksLoading: boolean;
+  linksStats: LinksStatsResponse | null;
   
   // UI State
   isLoading: boolean;
@@ -82,6 +83,7 @@ interface AppStore {
   
   // Links Actions
   loadLinks: (deviceId?: string) => Promise<void>;
+  loadLinksStats: () => Promise<void>;
   createLink: (data: CreateAccessLinkRequest) => Promise<AccessLinkResponse | null>;
   deleteLink: (linkId: string) => Promise<boolean>;
   revokeLink: (linkId: string) => Promise<boolean>;
@@ -106,6 +108,7 @@ export const useAppStore = create<AppStore>()(
       devicesLoading: false,
       accessLinks: [],
       linksLoading: false,
+      linksStats: null,
       isLoading: false,
       notifications: [],
       
@@ -423,6 +426,20 @@ export const useAppStore = create<AppStore>()(
         } catch (error) {
           set({ linksLoading: false });
           console.error('Load links error:', error);
+        }
+      },
+      
+      loadLinksStats: async () => {
+        try {
+          const response = await LinkAPI.getStats();
+          
+          if (response.success && response.data) {
+            set({ linksStats: response.data });
+          } else {
+            console.error('Failed to load links stats:', response.error);
+          }
+        } catch (error) {
+          console.error('Load links stats error:', error);
         }
       },
       

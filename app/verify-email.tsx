@@ -33,7 +33,7 @@ export default function VerifyEmailScreen() {
   const [resending, setResending] = useState(false);
   
   // Refs for input fields
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const handleCodeChange = (value: string, index: number) => {
     // Only accept numbers
@@ -153,7 +153,7 @@ export default function VerifyEmailScreen() {
                 Enter Verification Code
               </Text>
               <Text style={[styles.description, { color: colors.tabIconDefault }]}>
-                We've sent a 6-digit code to:
+                We&apos;ve sent a 6-digit code to:
               </Text>
               <Text style={[styles.email, { color: colors.text }]}>
                 {email}
@@ -164,7 +164,7 @@ export default function VerifyEmailScreen() {
                 {code.map((digit, index) => (
                   <TextInput
                     key={index}
-                    ref={(ref) => (inputRefs.current[index] = ref)}
+                    ref={(ref) => { inputRefs.current[index] = ref; }}
                     style={[
                       styles.codeInput,
                       {
@@ -202,7 +202,7 @@ export default function VerifyEmailScreen() {
               {/* Resend Code */}
               <View style={styles.resendContainer}>
                 <Text style={[styles.resendText, { color: colors.tabIconDefault }]}>
-                  Didn't receive the code?{' '}
+                  Didn&apos;t receive the code?{' '}
                 </Text>
                 <TouchableOpacity onPress={handleResend} disabled={resending}>
                   <Text style={[styles.resendLink, { color: colors.tint }]}>

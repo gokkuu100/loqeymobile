@@ -189,7 +189,7 @@ export default function UnlockScreen() {
           <View style={styles.infoContainer}>
             <Text style={[styles.infoText, { color: colors.tabIconDefault }]}>
               Make sure you have the correct password for this access link.
-              If you don't have the password, contact the device owner.
+              If you don&apos;t have the password, contact the device owner.
             </Text>
           </View>
         </ScrollView>
