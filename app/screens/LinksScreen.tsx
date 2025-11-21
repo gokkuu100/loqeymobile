@@ -198,7 +198,8 @@ export default function LinksScreen() {
 
   const handleShareLink = useCallback(async (link: AccessLink) => {
     try {
-      const shareableURL = link.link_url || generateShareableURL(link.link_token);
+      // Always generate fresh URL to ensure we use current domain
+      const shareableURL = generateShareableURL(link.link_token);
       
       let message;
       if (link.link_type === 'tracking_number') {
@@ -218,7 +219,8 @@ export default function LinksScreen() {
   }, [selectedDeviceName]);
 
   const handleCopyLink = useCallback((link: AccessLink) => {
-    const url = link.link_url || generateShareableURL(link.link_token);
+    // Always generate fresh URL to ensure we use current domain
+    const url = generateShareableURL(link.link_token);
     Clipboard.setString(url);
     Alert.alert('Copied!', 'Link URL copied to clipboard');
   }, []);

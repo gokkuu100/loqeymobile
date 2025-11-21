@@ -269,17 +269,19 @@ export class LinkAPI {
 
   /**
    * Helper: Generate shareable URL for a link
+   * Always generates URL using current domain to avoid stale URLs
    */
   static generateShareableURL(linkToken: string, baseURL?: string): string {
     const base = baseURL || process.env.EXPO_PUBLIC_API_BASE_URL?.replace('/api/v1', '');
-    return `${base}/api/v1/delivery/${linkToken}`;
+    return `${base}/delivery/${linkToken}/page`;
   }
 
   /**
    * Helper: Format instructions for tracking number links
    */
   static formatTrackingInstructions(link: AccessLink, deliveryURL?: string): string {
-    const url = deliveryURL || link.link_url || LinkAPI.generateShareableURL(link.link_token);
+    // Always generate fresh URL to ensure current domain is used
+    const url = deliveryURL || LinkAPI.generateShareableURL(link.link_token);
     return `Delivery Instructions:\n\nPlease use this link to unlock the delivery box:\n${url}\n\nYour tracking number: ${link.tracking_number}\n\nThis link expires on ${new Date(link.expires_at).toLocaleDateString()}`;
   }
 
@@ -287,7 +289,8 @@ export class LinkAPI {
    * Helper: Format instructions for access code links
    */
   static formatAccessCodeInstructions(link: AccessLink, accessCode: string, deliveryURL?: string): string {
-    const url = deliveryURL || link.link_url || LinkAPI.generateShareableURL(link.link_token);
+    // Always generate fresh URL to ensure current domain is used
+    const url = deliveryURL || LinkAPI.generateShareableURL(link.link_token);
     return `Delivery Access Link:\n${url}\n\nAccess Code: ${accessCode}\n\nPlease provide this code to the delivery person.\n\nValid until: ${new Date(link.expires_at).toLocaleDateString()}`;
   }
 }

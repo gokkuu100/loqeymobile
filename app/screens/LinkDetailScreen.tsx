@@ -41,8 +41,10 @@ export default function LinkDetailScreen() {
   };
 
   const handleCopyLink = () => {
-    if (link?.link_url) {
-      Clipboard.setString(link.link_url);
+    if (link?.link_token) {
+      // Always generate fresh URL to ensure we use current domain
+      const url = `${process.env.EXPO_PUBLIC_API_BASE_URL?.replace('/api/v1', '')}/delivery/${link.link_token}/page`;
+      Clipboard.setString(url);
       Alert.alert('Copied!', 'Link URL copied to clipboard');
     }
   };
@@ -166,7 +168,7 @@ export default function LinkDetailScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Shareable Link</Text>
           <View style={styles.linkUrlContainer}>
             <Text style={[styles.linkUrlText, { color: colors.tint }]} numberOfLines={2}>
-              {link.link_url || 'N/A'}
+              {link.link_token ? `${process.env.EXPO_PUBLIC_API_BASE_URL?.replace('/api/v1', '')}/delivery/${link.link_token}/page` : 'N/A'}
             </Text>
           </View>
           <TouchableOpacity
