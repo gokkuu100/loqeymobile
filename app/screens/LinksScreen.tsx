@@ -15,6 +15,8 @@ import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Header } from '@/components/ui/Header';
 import {
     ActivityIndicator,
     Alert,
@@ -34,6 +36,7 @@ import {
 export default function LinksScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const router = useRouter();
   
@@ -64,6 +67,11 @@ export default function LinksScreen() {
   // Memoize the selectedDeviceId and name to prevent unnecessary reloads
   const selectedDeviceId = useMemo(() => selectedDevice?.id, [selectedDevice?.id]);
   const selectedDeviceName = useMemo(() => selectedDevice?.name, [selectedDevice?.name]);
+
+  // Filter to show only active links
+  const activeLinks = useMemo(() => {
+    return links.filter(link => link.status === 'active');
+  }, [links]);
 
   useEffect(() => {
     if (isAuthenticated && selectedDeviceId) {
@@ -598,23 +606,21 @@ export default function LinksScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {FormModal}
+    <View style={[styles.outerContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <Header title="Access Links" showBack={true} />
       
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Delivery Links
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.tabIconDefault }]}>
+      <View style={styles.container}>
+        {FormModal}
+        
+        <View style={styles.infoSection}>
+          <Text style={[styles.deviceName, { color: colors.text }]}>
             {selectedDeviceName}
           </Text>
         </View>
-      </View>
 
-      {links.length > 0 ? (
+      {activeLinks.length > 0 ? (
         <FlatList
-          data={links}
+          data={activeLinks}
           renderItem={renderLinkItem}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
@@ -635,18 +641,22 @@ export default function LinksScreen() {
         <View style={[styles.centerContent, { flex: 1 }]}>
           <Ionicons name="link-outline" size={64} color={colors.tabIconDefault} />
           <Text style={[styles.emptyText, { color: colors.tabIconDefault }]}>
-            No delivery links found
+            No active delivery links found
           </Text>
           <Text style={[styles.emptySubtext, { color: colors.tabIconDefault }]}>
             Tap + to create your first link
           </Text>
         </View>
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     padding: 20,
@@ -661,6 +671,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 20,
+  },
+  infoSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  deviceName: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   headerTitle: {
     fontSize: 24,

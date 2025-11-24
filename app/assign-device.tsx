@@ -11,8 +11,8 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
-  SafeAreaView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '@/store';
@@ -20,6 +20,7 @@ import { useAppStore } from '@/store';
 const { width, height } = Dimensions.get('window');
 
 export default function AssignDeviceScreen() {
+  const insets = useSafeAreaInsets();
   const [serialNumber, setSerialNumber] = useState('');
   const [pin, setPin] = useState('');
   const [deviceName, setDeviceName] = useState('');
@@ -82,7 +83,7 @@ export default function AssignDeviceScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -101,7 +102,7 @@ export default function AssignDeviceScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -193,7 +194,7 @@ export default function AssignDeviceScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

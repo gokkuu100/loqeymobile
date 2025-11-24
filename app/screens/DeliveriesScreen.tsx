@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState, useCallback } from 'react';
 import { LinkAPI, AccessLink, DeliveryRecord } from '@/api/links';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Header } from '@/components/ui/Header';
 import {
     ActivityIndicator,
     Alert,
@@ -21,6 +23,7 @@ import {
 export default function DeliveriesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   
   const accessLinks = useAppStore((state) => state.accessLinks);
   const loadLinks = useAppStore((state) => state.loadLinks);
@@ -380,15 +383,15 @@ export default function DeliveriesScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <DetailsModal />
+    <View style={[styles.outerContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <Header title="Deliveries" showBack={true} />
       
-      <Text style={[styles.header, { color: colors.text }]}>
-        Delivery History
-      </Text>
-      <Text style={[styles.subheader, { color: colors.tabIconDefault }]}>
-        View completed and expired access links
-      </Text>
+      <View style={styles.container}>
+        <DetailsModal />
+        
+        <Text style={[styles.subheader, { color: colors.tabIconDefault }]}>
+          View completed and expired access links
+        </Text>
       
       {historyLinks.length > 0 ? (
         <FlatList
@@ -427,11 +430,15 @@ export default function DeliveriesScreen() {
           </View>
         </ScrollView>
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     padding: 20,

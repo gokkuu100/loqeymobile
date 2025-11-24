@@ -11,7 +11,6 @@ import {
     Keyboard,
     KeyboardAvoidingView,
     Platform,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
@@ -20,6 +19,7 @@ import {
     TouchableWithoutFeedback,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function CompleteProfileScreen() {
@@ -28,6 +28,7 @@ export default function CompleteProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const email = params.email as string;
+  const insets = useSafeAreaInsets();
   useAppStore();
 
   const [formData, setFormData] = useState({
@@ -187,14 +188,14 @@ export default function CompleteProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView 
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
             showsVerticalScrollIndicator={false}
           >
           {/* Header */}
@@ -271,7 +272,7 @@ export default function CompleteProfileScreen() {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

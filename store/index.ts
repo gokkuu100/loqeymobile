@@ -363,11 +363,14 @@ export const useAppStore = create<AppStore>()(
       updateDevice: async (deviceId, data) => {
         set({ isLoading: true });
         try {
+          console.log('[Store] updateDevice called:', { deviceId, data });
           const response = await DeviceAPI.updateDevice(deviceId, data);
+          console.log('[Store] updateDevice response:', response);
           
           if (response.success) {
             set({ isLoading: false });
             get().addNotification('success', 'Device updated successfully!');
+            console.log('[Store] Reloading devices after update');
             await get().loadDevices();
             return true;
           } else {
@@ -377,6 +380,7 @@ export const useAppStore = create<AppStore>()(
           }
         } catch (error) {
           set({ isLoading: false });
+          console.error('[Store] updateDevice error:', error);
           get().addNotification('error', 'Network error. Please try again.');
           return false;
         }
@@ -595,11 +599,23 @@ export const useAppStore = create<AppStore>()(
         authToken: state.authToken,
         isAuthenticated: state.isAuthenticated,
       }),
-      onRehydrateStorage: () => (state) => {
-        // Restore token to apiClient when store rehydrates
-        if (state?.authToken) {
-          apiClient.setAuthToken(state.authToken);
-        }
+      onRehydrateStorage: () => {
+        console.log('🔄 Starting store rehydration...');
+        return async (state, error) => {
+          if (error) {
+            console.error('❌ Store rehydration error:', error);
+            return;
+          }
+          
+          if (state?.authToken) {
+            console.log('✅ Store rehydrated with auth token');
+            console.log('🔑 Restoring token to apiClient...');
+            await apiClient.setAuthToken(state.authToken);
+            console.log('✅ Token restored to apiClient');
+          } else {
+            console.log('⚠️ Store rehydrated but no auth token found');
+          }
+        };
       },
     }
   )

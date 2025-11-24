@@ -13,11 +13,14 @@ import {
     View,
     ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Header } from '@/components/ui/Header';
 import { webSocketService } from '@/services/WebSocketService';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   
   // Use selectors to prevent unnecessary re-renders from WebSocket updates
   const user = useAppStore((state) => state.user);
@@ -79,9 +82,15 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Profile Header */}
-      <View style={styles.header}>
+    <View style={[styles.outerContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <Header title="Profile" showBack={true} />
+      
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+      >
+        {/* Profile Header */}
+        <View style={styles.header}>
         <View style={[styles.avatar, { backgroundColor: colors.tint }]}>
           <Text style={styles.avatarText}>
             {user?.first_name?.charAt(0).toUpperCase() || 'U'}
@@ -151,11 +160,15 @@ export default function ProfileScreen() {
           Version 1.0.0
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     padding: 20,

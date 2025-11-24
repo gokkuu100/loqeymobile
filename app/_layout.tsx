@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ToastContainer from '@/components/Toast';
 
 export default function RootLayout() {
@@ -16,53 +17,30 @@ export default function RootLayout() {
   useWebSocket({ enabled: isAuthenticated });
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: Colors[colorScheme ?? 'light'].background },
-        }}
-      >
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: Colors[colorScheme ?? 'light'].background },
+          }}
+        >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="signin" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
-        <Stack.Screen name="deliveries" options={{ 
-          title: 'Deliveries',
-          headerShown: true,
-          headerStyle: { backgroundColor: Colors[colorScheme ?? 'light'].background },
-          headerTintColor: Colors[colorScheme ?? 'light'].text,
-        }} />
-        <Stack.Screen name="events" options={{ 
-          title: 'Events',
-          headerShown: true,
-          headerStyle: { backgroundColor: Colors[colorScheme ?? 'light'].background },
-          headerTintColor: Colors[colorScheme ?? 'light'].text,
-        }} />
-        <Stack.Screen name="settings" options={{ 
-          title: 'Settings',
-          headerShown: true,
-          headerStyle: { backgroundColor: Colors[colorScheme ?? 'light'].background },
-          headerTintColor: Colors[colorScheme ?? 'light'].text,
-        }} />
-        <Stack.Screen name="profile" options={{ 
-          title: 'Profile',
-          headerShown: true,
-          headerStyle: { backgroundColor: Colors[colorScheme ?? 'light'].background },
-          headerTintColor: Colors[colorScheme ?? 'light'].text,
-        }} />
-        <Stack.Screen name="links" options={{ 
-          title: 'Access Links',
-          headerShown: true,
-          headerStyle: { backgroundColor: Colors[colorScheme ?? 'light'].background },
-          headerTintColor: Colors[colorScheme ?? 'light'].text,
-        }} />
-        <Stack.Screen name="unlock" options={{ 
-          title: 'Unlock Device',
-          headerShown: false,
-        }} />
-      </Stack>
-      <ToastContainer />
-      <StatusBar style="auto" />
-    </GestureHandlerRootView>
+        <Stack.Screen name="deliveries" options={{ headerShown: false }} />
+        <Stack.Screen name="events" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
+        <Stack.Screen name="links" options={{ headerShown: false }} />
+        <Stack.Screen name="unlock" options={{ headerShown: false }} />
+        <Stack.Screen name="assign-device" options={{ headerShown: false }} />
+        <Stack.Screen name="complete-profile" options={{ headerShown: false }} />
+        <Stack.Screen name="verify-email" options={{ headerShown: false }} />
+        </Stack>
+        <ToastContainer />
+        <StatusBar style="auto" />
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }

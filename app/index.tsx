@@ -10,13 +10,14 @@ import {
     Alert,
     Dimensions,
     Modal,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
+    ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -24,10 +25,13 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [deviceSelectorVisible, setDeviceSelectorVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [linkTypeModalVisible, setLinkTypeModalVisible] = useState(false);
+  const [deviceListExpanded, setDeviceListExpanded] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isInitializing, setIsInitializing] = useState(true);
   
   // Use selectors to prevent unnecessary re-renders from WebSocket updates
   const user = useAppStore((state) => state.user);
@@ -45,6 +49,32 @@ export default function HomeScreen() {
   // WebSocket is now managed at root level in _layout.tsx
   // This prevents multiple instances and connection churn
 
+  // Check authentication and redirect if needed
+  useEffect(() => {
+    const initializeAuth = async () => {
+      // Give the store time to rehydrate
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      console.log('🔐 Auth check - isAuthenticated:', isAuthenticated);
+      
+      if (!isAuthenticated) {
+        console.log('❌ Not authenticated, redirecting to signin');
+        router.replace('/signin');
+      } else {
+        console.log('✅ Authenticated, loading data');
+        // Load initial data
+        await Promise.all([
+          loadDevices(),
+          loadLinksStats()
+        ]);
+      }
+      
+      setIsInitializing(false);
+    };
+    
+    initializeAuth();
+  }, []);
+
   // Update current time every 5 seconds to refresh "time ago" displays
   useEffect(() => {
     const timer = setInterval(() => {
@@ -53,14 +83,6 @@ export default function HomeScreen() {
 
     return () => clearInterval(timer);
   }, []);
-
-  // Load devices on first mount
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadDevices();
-      loadLinksStats();
-    }
-  }, [isAuthenticated]);
 
   // Reload devices and stats whenever screen comes into focus
   useFocusEffect(
@@ -256,8 +278,20 @@ export default function HomeScreen() {
     </Modal>
   );
 
+  // Show loading screen while initializing
+  if (isInitializing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+        <Text style={[styles.loadingText, { color: colors.text, marginTop: 16 }]}>
+          Loading...
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <LinkTypeModal />
       <MenuModal />
       
@@ -272,21 +306,26 @@ export default function HomeScreen() {
         
         <Text style={[styles.headerTitle, { color: colors.text }]}>loqey</Text>
         
-        <View style={styles.headerRight} />
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => {
+            // TODO: Navigate to notifications screen
+            Alert.alert('Notifications', 'Notifications feature coming soon!');
+          }}
+        >
+          <Ionicons name="notifications-outline" size={24} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView 
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Greeting Section */}
         <View style={styles.greetingSection}>
           <Text style={[styles.greeting, { color: colors.text }]}>
-            {getGreeting()},
-          </Text>
-          <Text style={[styles.userName, { color: colors.text }]}>
-            {user?.first_name || 'User'}
+            {getGreeting()}, {user?.first_name || 'User'}
           </Text>
         </View>
 
@@ -312,17 +351,71 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Device Selector */}
-        {devices.length > 1 && (
-          <TouchableOpacity 
-            style={[styles.deviceSelector, { backgroundColor: colors.card }]}
-            onPress={() => setDeviceSelectorVisible(true)}
-          >
-            <Text style={[styles.selectorLabel, { color: colors.text }]}>
-              Current Device: {selectedDevice?.name || 'None'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color={colors.tabIconDefault} />
-          </TouchableOpacity>
+        {/* Device Dropdown */}
+        {devices.length > 0 && (
+          <View style={[styles.deviceDropdown, { backgroundColor: colors.card }]}>
+            <TouchableOpacity
+              style={styles.deviceDropdownHeader}
+              onPress={() => setDeviceListExpanded(!deviceListExpanded)}
+            >
+              <View style={styles.deviceDropdownHeaderContent}>
+                <Ionicons name="hardware-chip-outline" size={20} color={colors.text} />
+                <Text style={[styles.deviceDropdownLabel, { color: colors.text }]}>
+                  {selectedDevice?.user_device_name || selectedDevice?.name || 'Select Device'}
+                </Text>
+              </View>
+              <Ionicons 
+                name={deviceListExpanded ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color={colors.tabIconDefault} 
+              />
+            </TouchableOpacity>
+
+            {deviceListExpanded && (
+              <View style={styles.deviceDropdownList}>
+                {devices.map((device) => (
+                  <TouchableOpacity
+                    key={device.id}
+                    style={[
+                      styles.deviceDropdownItem,
+                      selectedDevice?.id === device.id && { backgroundColor: colors.tint + '10' }
+                    ]}
+                    onPress={() => {
+                      setSelectedDevice(device);
+                      setDeviceListExpanded(false);
+                    }}
+                  >
+                    <View style={styles.deviceDropdownItemContent}>
+                      <View style={styles.deviceDropdownItemHeader}>
+                        <Text style={[styles.deviceDropdownItemName, { color: colors.text }]}>
+                          {device.user_device_name || device.name}
+                        </Text>
+                        <View style={styles.deviceDropdownItemStatus}>
+                          <Ionicons 
+                            name={device.lock_status === 'locked' ? "lock-closed" : "lock-open"} 
+                            size={14} 
+                            color={device.lock_status === 'locked' ? colors.tint : "#4CAF50"} 
+                          />
+                          <View 
+                            style={[
+                              styles.statusDot,
+                              { backgroundColor: device.is_online ? '#4CAF50' : '#9E9E9E' }
+                            ]} 
+                          />
+                        </View>
+                      </View>
+                      <Text style={[styles.deviceDropdownItemSerial, { color: colors.tabIconDefault }]}>
+                        SN: {device.serial_number}
+                      </Text>
+                    </View>
+                    {selectedDevice?.id === device.id && (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.tint} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
         )}
 
         {/* Main Lock/Unlock Circle - Only show when devices exist */}
@@ -481,18 +574,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Add Device Button - Only show when devices exist */}
-        {devices.length > 0 && (
-        <View style={styles.addButtonContainer}>
-          <TouchableOpacity 
-            style={[styles.addButton, { backgroundColor: colors.tint }]}
-            onPress={handleAddDevice}
-          >
-            <Ionicons name="add" size={24} color="white" />
-          </TouchableOpacity>
-        </View>
-        )}
       </ScrollView>
 
       {/* Device Selector Modal */}
@@ -538,7 +619,7 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -585,6 +666,65 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '600',
     marginTop: 4,
+  },
+  deviceDropdown: {
+    borderRadius: 12,
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    overflow: 'hidden',
+  },
+  deviceDropdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  deviceDropdownHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  deviceDropdownLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  deviceDropdownList: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  deviceDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.03)',
+  },
+  deviceDropdownItemContent: {
+    flex: 1,
+  },
+  deviceDropdownItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  deviceDropdownItemName: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  deviceDropdownItemStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deviceDropdownItemSerial: {
+    fontSize: 13,
   },
   deviceSelector: {
     flexDirection: 'row',
@@ -686,22 +826,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     textAlign: 'center',
-  },
-  addButtonContainer: {
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  addButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -887,5 +1011,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

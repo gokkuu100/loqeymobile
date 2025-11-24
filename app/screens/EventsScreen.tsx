@@ -4,6 +4,8 @@ import { Activity } from '@/store/types';
 import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Header } from '@/components/ui/Header';
 import {
     FlatList,
     StyleSheet,
@@ -15,6 +17,7 @@ import {
 export default function EventsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<'today' | 'week' | 'all'>('today');
   
   // Use selector to prevent unnecessary re-renders from WebSocket updates
@@ -99,9 +102,12 @@ export default function EventsScreen() {
   const filteredActivities = getFilteredActivities();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Filter Buttons */}
-      <View style={styles.filterContainer}>
+    <View style={[styles.outerContainer, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <Header title="Events" showBack={true} />
+      
+      <View style={styles.container}>
+        {/* Filter Buttons */}
+        <View style={styles.filterContainer}>
         {(['today', 'week', 'all'] as const).map((filterOption) => (
           <TouchableOpacity
             key={filterOption}
@@ -144,11 +150,15 @@ export default function EventsScreen() {
           </Text>
         </View>
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     padding: 20,
