@@ -1,15 +1,19 @@
 {
   "expo": {
     "name": "loqeymobile",
-    "slug": "loqeymobile",
-    "version": "1.0.0",
+    "slug": "loqeyapp",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon@300x.png",
     "scheme": "loqeymobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.loqey.loqeyapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -48,9 +52,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "866b66cf-307d-407d-9d4c-41b9df24b9b8"
+        "projectId": "45ed33d1-6b7f-4c21-9bee-103c28bade43"
       }
     },
-    "owner": "princeloqey"
+    "owner": "loqey"
   }
 }

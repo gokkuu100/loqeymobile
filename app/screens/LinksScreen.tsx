@@ -204,34 +204,47 @@ export default function LinksScreen() {
     }
   }, [selectedDeviceId, isAuthenticated, linkType, trackingNumber, accessCode, linkName, duration, maxUses, loadLinks, resetForm]);
 
-  const handleShareLink = useCallback(async (link: AccessLink) => {
-    try {
-      // Always generate fresh URL to ensure we use current domain
-      const shareableURL = generateShareableURL(link.link_token);
-      
-      let message;
-      if (link.link_type === 'tracking_number') {
-        message = `Delivery Instructions:\n\nUse this link to unlock the delivery box:\n${shareableURL}\n\nTracking Number: ${link.tracking_number}\n\nValid until: ${new Date(link.expires_at).toLocaleString()}`;
-      } else {
-        message = `Delivery Access Link:\n${shareableURL}\n\nYou'll need the access code I provided.\n\nValid until: ${new Date(link.expires_at).toLocaleString()}`;
-      }
-      
-      await Share.share({
-        message,
-        title: `Delivery Link - ${selectedDeviceName}`,
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to share link');
-      console.error('Share error:', error);
-    }
-  }, [selectedDeviceName]);
-
   const handleCopyLink = useCallback((link: AccessLink) => {
-    // Always generate fresh URL to ensure we use current domain
     const url = generateShareableURL(link.link_token);
-    Clipboard.setString(url);
-    Alert.alert('Copied!', 'Link URL copied to clipboard');
-  }, []);
+    
+    let instructions;
+    if (link.link_type === 'tracking_number') {
+      instructions = `Delivery Access Instructions
+
+Tracking Number: ${link.tracking_number}
+
+Access Link: ${url}
+
+Valid until: ${new Date(link.expires_at).toLocaleString()}
+
+How to use:
+1. Click the link to open the delivery page
+2. Confirm the tracking number
+3. Follow the unlock instructions
+4. Grant access to the delivery location
+
+ `;
+    } else {
+      instructions = `Delivery Access Code
+
+Access Code: ${link.name || 'Delivery Access'}
+
+Access Link: ${url}
+
+Valid until: ${new Date(link.expires_at).toLocaleString()}
+
+How to use:
+1. Click the link or enter the code
+2. Use this code: ${accessCode || '****'}
+3. Follow the access instructions
+4. Grant access to the delivery location
+
+`;
+    }
+    
+    Clipboard.setString(instructions);
+    Alert.alert('Copied!', 'Instructions copied to clipboard');
+  }, [selectedDeviceName, accessCode]);
 
   const handleRevokeLink = useCallback((link: AccessLink) => {
     Alert.alert(
@@ -286,7 +299,15 @@ export default function LinksScreen() {
   };
 
   const getLinkTypeBadgeColor = (type: LinkType) => {
-    return type === 'tracking_number' ? '#2196F3' : '#9C27B0';
+    return colors.tint;
+  };
+
+  const getModalHeaderColor = (type: LinkType) => {
+    return colors.tint;
+  };
+
+  const getModalButtonColor = (type: LinkType) => {
+    return colors.tint;
   };
 
   const renderLinkItem = useCallback(({ item }: { item: AccessLink }) => {
@@ -326,7 +347,7 @@ export default function LinksScreen() {
             </View>
             <View style={[
               styles.statusBadge,
-              { backgroundColor: active ? '#4CAF50' : '#F44336' }
+              { backgroundColor: active ? colors.tint : colors.tabIconDefault + '40' }
             ]}>
               <Text style={styles.badgeText}>
                 {active ? 'Active' : item.status}
@@ -360,7 +381,7 @@ export default function LinksScreen() {
 
         <View style={styles.linkActions}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#6366F1' }]}
+            style={[styles.actionButton, { backgroundColor: colors.tint }]}
             onPress={() => handleViewLinkDetails(item)}
           >
             <Ionicons name="information-circle-outline" size={18} color="white" />
@@ -369,13 +390,6 @@ export default function LinksScreen() {
           {active && (
             <>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.tint }]}
-                onPress={() => handleShareLink(item)}
-              >
-                <Ionicons name="share-outline" size={18} color="white" />
-                <Text style={styles.actionButtonText}>Share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.tabIconDefault }]}
                 onPress={() => handleCopyLink(item)}
               >
@@ -383,17 +397,17 @@ export default function LinksScreen() {
                 <Text style={styles.actionButtonText}>Copy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#F44336' }]}
+                style={[styles.actionButtonIcon, { backgroundColor: colors.tabIconDefault + '20' }]}
                 onPress={() => handleRevokeLink(item)}
               >
-                <Ionicons name="ban-outline" size={18} color="white" />
+                <Ionicons name="trash-outline" size={18} color={colors.tabIconDefault} />
               </TouchableOpacity>
             </>
           )}
         </View>
       </View>
     );
-  }, [colors, handleShareLink, handleCopyLink, handleRevokeLink, handleViewLinkDetails]);
+  }, [colors, handleCopyLink, handleRevokeLink, handleViewLinkDetails]);
 
   // Memoize colors to prevent re-renders
   const cardBackgroundColor = useMemo(() => colors.card, [colors.card]);
@@ -421,7 +435,7 @@ export default function LinksScreen() {
             <View style={styles.formHeader}>
               <View style={[
                 styles.formIconContainer, 
-                { backgroundColor: linkType === 'tracking_number' ? '#2196F3' : '#9C27B0' }
+                { backgroundColor: getModalHeaderColor(linkType) }
               ]}>
                 <Ionicons 
                   name={linkType === 'tracking_number' ? 'barcode-outline' : 'key-outline'} 
@@ -533,7 +547,11 @@ export default function LinksScreen() {
 
             <View style={styles.formButtons}>
               <TouchableOpacity
-                style={[styles.formButton, { backgroundColor: tabIconColor + '30' }]}
+                style={[styles.formButton, { 
+                  backgroundColor: tabIconColor + '20',
+                  borderWidth: 1,
+                  borderColor: tabIconColor + '40'
+                }]}
                 onPress={handleModalClose}
                 disabled={creating}
               >
@@ -544,7 +562,7 @@ export default function LinksScreen() {
               
               <TouchableOpacity
                 style={[styles.formButton, { 
-                  backgroundColor: linkType === 'tracking_number' ? '#2196F3' : '#9C27B0',
+                  backgroundColor: getModalButtonColor(linkType),
                   opacity: creating ? 0.7 : 1
                 }]}
                 onPress={handleCreateLink}
@@ -776,6 +794,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 6,
     gap: 4,
+  },
+  actionButtonIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButtonText: {
     color: 'white',

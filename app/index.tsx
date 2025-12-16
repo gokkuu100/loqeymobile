@@ -52,8 +52,9 @@ export default function HomeScreen() {
   // Check authentication and redirect if needed
   useEffect(() => {
     const initializeAuth = async () => {
-      // Give the store time to rehydrate
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Give the store time to rehydrate and validate token
+      // Wait longer to allow for token refresh if needed
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       console.log('🔐 Auth check - isAuthenticated:', isAuthenticated);
       
@@ -304,7 +305,7 @@ export default function HomeScreen() {
           <Ionicons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
         
-        <Text style={[styles.headerTitle, { color: colors.text }]}>loqey</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>loQey</Text>
         
         <TouchableOpacity
           style={styles.menuButton}

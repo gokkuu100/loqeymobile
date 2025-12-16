@@ -160,7 +160,7 @@ export default function SignInScreen() {
             </View>
             
             {/* Company Name */}
-            <Text style={[styles.companyName, { color: colors.text }]}>loqey</Text>
+            <Text style={[styles.companyName, { color: colors.text }]}>loQey</Text>
             <Text style={[styles.tagline, { color: colors.tabIconDefault }]}>
               Secure. Smart. Simple.
             </Text>
