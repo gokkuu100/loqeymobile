@@ -38,7 +38,7 @@ export default function NotificationListScreen() {
     const LIMIT = 20;
 
     // Load notifications
-    const loadNotifications = async (skipCount: number = 0, append: boolean = false) => {
+    const loadNotifications = useCallback(async (skipCount: number = 0, append: boolean = false) => {
         if (append) {
             setIsLoadingMore(true);
         } else {
@@ -47,6 +47,9 @@ export default function NotificationListScreen() {
 
         try {
             const response = await NotificationAPI.getHistory(skipCount, LIMIT);
+            if (!response.data) {
+                throw new Error('No data received');
+            }
             const { notifications: newNotifications, total: totalCount } = response.data;
 
             if (append) {
@@ -66,12 +69,40 @@ export default function NotificationListScreen() {
             setIsLoadingMore(false);
             setIsRefreshing(false);
         }
-    };
+    }, [LIMIT]);
+
+    // Mark all as read (silent = no alert)
+    const handleMarkAllAsRead = useCallback(async (silent: boolean = false) => {
+        try {
+            await NotificationAPI.markAsRead();
+
+            // Update local state
+            setNotifications(prev =>
+                prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
+            );
+
+            // Fetch fresh unread count from backend
+            const countResponse = await NotificationAPI.getUnreadCount();
+            const store = useAppStore.getState();
+            if (countResponse.data) {
+                store.setUnreadNotificationCount(countResponse.data.unread_count);
+            }
+
+            if (!silent) {
+                Alert.alert('Success', 'All notifications marked as read');
+            }
+        } catch (error: any) {
+            if (!silent) {
+                console.error('Failed to mark as read:', error);
+                Alert.alert('Error', 'Failed to mark notifications as read');
+            }
+        }
+    }, []);
 
     // Initial load
     useEffect(() => {
         loadNotifications(0, false);
-    }, []);
+    }, [loadNotifications]);
 
     // Reload when screen comes into focus
     useFocusEffect(
@@ -79,7 +110,7 @@ export default function NotificationListScreen() {
             loadNotifications(0, false);
             // Mark all as read when screen is opened
             handleMarkAllAsRead(true); // Silent mode
-        }, [])
+        }, [loadNotifications, handleMarkAllAsRead])
     );
 
     // Handle refresh
@@ -92,32 +123,6 @@ export default function NotificationListScreen() {
     const handleLoadMore = () => {
         if (!isLoadingMore && hasMore && notifications.length > 0) {
             loadNotifications(skip + LIMIT, true);
-        }
-    };
-
-    // Mark all as read (silent = no alert)
-    const handleMarkAllAsRead = async (silent: boolean = false) => {
-        try {
-            await NotificationAPI.markAsRead();
-
-            // Update local state
-            setNotifications(prev =>
-                prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
-            );
-
-            // Fetch fresh unread count from backend
-            const countResponse = await NotificationAPI.getUnreadCount();
-            const store = useAppStore.getState();
-            store.setUnreadNotificationCount(countResponse.data.unread_count);
-
-            if (!silent) {
-                Alert.alert('Success', 'All notifications marked as read');
-            }
-        } catch (error: any) {
-            if (!silent) {
-                console.error('Failed to mark as read:', error);
-                Alert.alert('Error', 'Failed to mark notifications as read');
-            }
         }
     };
 
@@ -140,7 +145,9 @@ export default function NotificationListScreen() {
             // Fetch fresh unread count from backend
             const countResponse = await NotificationAPI.getUnreadCount();
             const store = useAppStore.getState();
-            store.setUnreadNotificationCount(countResponse.data.unread_count);
+            if (countResponse.data) {
+                store.setUnreadNotificationCount(countResponse.data.unread_count);
+            }
 
             setSelectedIds(new Set());
             setSelectionMode(false);
@@ -399,13 +406,6 @@ export default function NotificationListScreen() {
             <Header
                 title="Notifications"
                 showBack={true}
-                rightContent={
-                    !selectionMode && notifications.length > 0 ? (
-                        <TouchableOpacity onPress={() => setSelectionMode(true)}>
-                            <Text style={[styles.headerButton, { color: colors.tint }]}>Select</Text>
-                        </TouchableOpacity>
-                    ) : null
-                }
             />
 
             {/* Selection Mode Actions */}
