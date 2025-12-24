@@ -16,10 +16,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '@/store';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 const { width, height } = Dimensions.get('window');
 
 export default function AssignDeviceScreen() {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const [serialNumber, setSerialNumber] = useState('');
   const [pin, setPin] = useState('');
@@ -83,21 +87,21 @@ export default function AssignDeviceScreen() {
   };
 
   return (
-    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+    <View style={[styles.safeArea, { paddingTop: insets.top, backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Header with Back Button */}
-        <View style={styles.headerBar}>
+        <View style={[styles.headerBar, { backgroundColor: colors.background, borderBottomColor: colors.tabIconDefault + '30' }]}>
           <TouchableOpacity 
             style={styles.backButton} 
             onPress={() => router.back()}
             disabled={loading}
           >
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add Device</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Add Device</Text>
           <View style={styles.headerRight} />
         </View>
 
@@ -107,32 +111,32 @@ export default function AssignDeviceScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: colors.tabIconDefault }]}>
               Enter the serial number and PIN from your Loqey device
             </Text>
 
-            <View style={styles.form}>
+            <View style={[styles.form, { backgroundColor: colors.card }]}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Serial Number *</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Serial Number *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: colors.text, backgroundColor: colors.background, borderColor: colors.tabIconDefault + '40' }]}
                   placeholder="e.g., a0764e34b8de"
                   value={serialNumber}
                   onChangeText={setSerialNumber}
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!loading}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.tabIconDefault}
                 />
-                <Text style={styles.hint}>
+                <Text style={[styles.hint, { color: colors.tabIconDefault }]}>
                   Found on your device label
                 </Text>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>PIN *</Text>
+                <Text style={[styles.label, { color: colors.text }]}>PIN *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: colors.text, backgroundColor: colors.background, borderColor: colors.tabIconDefault + '40' }]}
                   placeholder="Enter 6-digit PIN"
                   value={pin}
                   onChangeText={setPin}
@@ -140,32 +144,32 @@ export default function AssignDeviceScreen() {
                   maxLength={6}
                   secureTextEntry
                   editable={!loading}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.tabIconDefault}
                 />
-                <Text style={styles.hint}>
+                <Text style={[styles.hint, { color: colors.tabIconDefault }]}>
                   PIN provided by administrator
                 </Text>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Device Name (Optional)</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Device Name (Optional)</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: colors.text, backgroundColor: colors.background, borderColor: colors.tabIconDefault + '40' }]}
                   placeholder="e.g., Front Door Box"
                   value={deviceName}
                   onChangeText={setDeviceName}
                   autoCapitalize="words"
                   editable={!loading}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.tabIconDefault}
                 />
-                <Text style={styles.hint}>
+                <Text style={[styles.hint, { color: colors.tabIconDefault }]}>
                   Give your device a friendly name
                 </Text>
               </View>
             </View>
 
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[styles.button, { backgroundColor: colors.tint, shadowColor: colors.tint }, loading && styles.buttonDisabled]}
               onPress={handleAssignDevice}
               disabled={loading}
             >
@@ -176,18 +180,18 @@ export default function AssignDeviceScreen() {
               )}
             </TouchableOpacity>
 
-            <View style={styles.infoBox}>
+            <View style={[styles.infoBox, { backgroundColor: colors.tint + '20', borderLeftColor: colors.tint }]}>
               <View style={styles.infoHeader}>
-                <Ionicons name="information-circle" size={20} color="#2196F3" />
-                <Text style={styles.infoTitle}>Need help?</Text>
+                <Ionicons name="information-circle" size={20} color={colors.tint} />
+                <Text style={[styles.infoTitle, { color: colors.tint }]}>Need help?</Text>
               </View>
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: colors.text }]}>
                 • Serial number is on the device label
               </Text>
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: colors.text }]}>
                 • PIN is provided by your admin
               </Text>
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: colors.text }]}>
                 • Contact support for assistance
               </Text>
             </View>
@@ -201,11 +205,9 @@ export default function AssignDeviceScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   headerBar: {
     flexDirection: 'row',
@@ -213,9 +215,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: width * 0.05,
     paddingVertical: height * 0.02,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   backButton: {
     padding: 8,
@@ -223,7 +223,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
   },
   headerRight: {
     width: 40, // Same width as back button for centering
@@ -236,12 +235,10 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 15,
-    color: '#666',
     lineHeight: 22,
     marginBottom: height * 0.03,
   },
   form: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: width * 0.05,
     marginBottom: height * 0.02,
@@ -257,38 +254,32 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: '#fafafa',
     minHeight: 50,
   },
   hint: {
     fontSize: 12,
-    color: '#999',
     marginTop: 6,
   },
   button: {
-    backgroundColor: '#007AFF',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: height * 0.02,
-    shadowColor: '#007AFF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    opacity: 0.5,
     shadowOpacity: 0,
   },
   buttonText: {
@@ -297,12 +288,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   infoBox: {
-    backgroundColor: '#e3f2fd',
     borderRadius: 12,
     padding: width * 0.045,
     marginTop: height * 0.03,
     borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
   },
   infoHeader: {
     flexDirection: 'row',
@@ -312,12 +301,10 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1976D2',
     marginLeft: 8,
   },
   infoText: {
     fontSize: 13,
-    color: '#1565C0',
     marginBottom: 6,
     lineHeight: 20,
   },

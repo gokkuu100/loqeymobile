@@ -12,6 +12,7 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header } from '@/components/ui/Header';
@@ -230,7 +231,7 @@ export default function SettingsScreen() {
         
         <TouchableOpacity 
           style={[styles.menuItem, { backgroundColor: colors.card }]}
-          onPress={() => Alert.alert('Notifications', 'Notification settings coming soon!')}
+          onPress={() => router.push('/screens/NotificationSettingsScreen')}
         >
           <Ionicons name="notifications-outline" size={24} color={colors.tint} />
           <Text style={[styles.menuText, { color: colors.text }]}>
@@ -241,7 +242,11 @@ export default function SettingsScreen() {
 
         <TouchableOpacity 
           style={[styles.menuItem, { backgroundColor: colors.card }]}
-          onPress={() => Alert.alert('Privacy', 'Privacy settings coming soon!')}
+          onPress={() => {
+            Linking.openURL('https://loqey.us/').catch(() => {
+              Alert.alert('Error', 'Unable to open the privacy page');
+            });
+          }}
         >
           <Ionicons name="shield-outline" size={24} color={colors.tint} />
           <Text style={[styles.menuText, { color: colors.text }]}>
@@ -252,7 +257,7 @@ export default function SettingsScreen() {
 
         <TouchableOpacity 
           style={[styles.menuItem, { backgroundColor: colors.card }]}
-          onPress={() => Alert.alert('Help', 'Help & Support coming soon!')}
+          onPress={() => router.push('/screens/HelpAndSupportScreen')}
         >
           <Ionicons name="help-circle-outline" size={24} color={colors.tint} />
           <Text style={[styles.menuText, { color: colors.text }]}>

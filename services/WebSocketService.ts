@@ -140,6 +140,21 @@ class WebSocketService {
       return;
     }
 
+    // Handle new notification - increment unread count
+    if (message.type === 'notification' || 
+        (message.type === 'user_update' && message.data?.type === 'notification')) {
+      console.log('[WebSocketService] New notification received');
+      
+      // Increment unread notification count
+      useAppStore.getState().incrementUnreadNotificationCount();
+      
+      // Optionally show a toast/banner notification
+      if (message.data?.title && message.data?.body) {
+        useAppStore.getState().addNotification('info', `${message.data.title}: ${message.data.body}`);
+      }
+      return;
+    }
+
     // Handle link_used updates for real-time link status
     if (message.type === 'user_update' && message.data?.type === 'link_used') {
       const linkUpdate = message.data;
@@ -165,7 +180,9 @@ class WebSocketService {
    * Implements silent token refresh to maintain seamless connection
    */
   private async getValidToken(): Promise<string | null> {
-    const token = await AsyncStorage.getItem('auth_token');
+    // Get token from Zustand store (single source of truth)
+    const { useAppStore } = require('../store');
+    const token = useAppStore.getState().authToken;
     if (!token) return null;
 
     // Check if token is expired or expiring soon
@@ -192,8 +209,8 @@ class WebSocketService {
           for (let i = 0; i < 50; i++) {
             await new Promise(resolve => setTimeout(resolve, 100));
             if (!this.isRefreshingToken) {
-              // Refresh completed, get the new token
-              const newToken = await AsyncStorage.getItem('auth_token');
+              // Refresh completed, get the new token from Zustand
+              const newToken = useAppStore.getState().authToken;
               console.log('[WebSocketService] Got refreshed token');
               return newToken;
             }
@@ -216,7 +233,13 @@ class WebSocketService {
           
           if (response.success && response.data) {
             console.log('✅ [WebSocketService] Token refreshed successfully');
-            await AsyncStorage.setItem('auth_token', response.data.access_token);
+            
+            // Update Zustand store with new token (single source of truth)
+            const { useAppStore } = require('../store');
+            useAppStore.setState({
+              authToken: response.data.access_token,
+              isAuthenticated: true,
+            });
             
             // Store new refresh token if provided
             if (response.data.refresh_token) {

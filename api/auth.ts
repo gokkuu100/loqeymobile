@@ -73,6 +73,7 @@ export interface CompleteProfileData {
 export class AuthAPI {
   /**
    * Login with email and password
+   * Note: Token is managed by the store's login action, not here
    */
   static async login(email: string, password: string): Promise<ApiResponse<LoginResponse>> {
     const response = await apiClient.post<LoginResponse>('/auth/login', {
@@ -80,9 +81,8 @@ export class AuthAPI {
       password,
     });
 
-    if (response.success && response.data) {
-      await apiClient.setAuthToken(response.data.access_token);
-    }
+    // Token is set in Zustand store by the calling code (store's login action)
+    // No need to call setAuthToken here
 
     return response;
   }
@@ -127,16 +127,15 @@ export class AuthAPI {
 
   /**
    * Refresh access token using refresh token
+   * Note: Token is automatically updated in Zustand store by the API client
    */
   static async refreshToken(refreshToken: string): Promise<ApiResponse<LoginResponse>> {
     const response = await apiClient.post<LoginResponse>('/auth/refresh', {
       refresh_token: refreshToken
     });
 
-    if (response.success && response.data) {
-      // Update stored tokens
-      await apiClient.setAuthToken(response.data.access_token);
-    }
+    // Token is automatically updated in Zustand by the apiClient refresh logic
+    // No need to manually call setAuthToken - it's handled in apiClient.refreshAccessToken()
 
     return response;
   }
@@ -186,19 +185,20 @@ export class AuthAPI {
 
   /**
    * Complete profile after email verification
+   * Note: Token is managed by the calling code (store action)
    */
   static async completeProfile(data: CompleteProfileData): Promise<ApiResponse<LoginResponse>> {
     const response = await apiClient.post<LoginResponse>('/auth/complete-profile', data);
 
-    if (response.success && response.data) {
-      await apiClient.setAuthToken(response.data.access_token);
-    }
+    // Token is set in Zustand store by the calling code
+    // No need to call setAuthToken here
 
     return response;
   }
 
   /**
    * Login with status check for incomplete profiles
+   * Note: Token is managed by the calling code (store action)
    */
   static async loginWithStatus(email: string, password: string): Promise<ApiResponse<LoginStatusResponse>> {
     const response = await apiClient.post<LoginStatusResponse>('/auth/login-status', {
@@ -206,9 +206,8 @@ export class AuthAPI {
       password,
     });
 
-    if (response.success && response.data?.access_token) {
-      await apiClient.setAuthToken(response.data.access_token);
-    }
+    // Token is set in Zustand store by the calling code
+    // No need to call setAuthToken here
 
     return response;
   }

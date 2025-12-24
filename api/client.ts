@@ -16,6 +16,8 @@ export interface ApiError {
 class ApiClient {
   private baseURL: string;
   private defaultHeaders: HeadersInit;
+  private isRefreshing: boolean = false;
+  private refreshSubscribers: Array<(token: string) => void> = [];
 
   constructor() {
     // Use the actual backend server URL
@@ -36,48 +38,135 @@ class ApiClient {
   }
 
   /**
-   * Get stored authentication token
+   * Get stored authentication token from Zustand store (single source of truth)
    */
-  private async getAuthToken(): Promise<string | null> {
+  private getAuthToken(): string | null {
     try {
-      return await AsyncStorage.getItem('auth_token');
+      // Import Zustand store dynamically to avoid circular dependencies
+      const { useAppStore } = require('../store');
+      const token = useAppStore.getState().authToken;
+      
+      // Debug logging (remove in production)
+      if (!token) {
+        console.log('🔑 Token check - Zustand: MISSING!');
+      }
+      
+      return token || null;
     } catch (error) {
-      console.warn('Failed to get auth token:', error);
+      console.warn('❌ Failed to get auth token from store:', error);
       return null;
     }
   }
 
   /**
-   * Store authentication token
+   * Remove authentication tokens from storage
    */
-  async setAuthToken(token: string): Promise<void> {
+  async clearAuthToken(): Promise<void> {
     try {
-      await AsyncStorage.setItem('auth_token', token);
+      await AsyncStorage.removeItem('refresh_token');
+      console.log('✅ Refresh token cleared from AsyncStorage');
+      
+      // Clear from Zustand store will be handled by logout action
     } catch (error) {
-      console.error('Failed to store auth token:', error);
-      throw new Error('Failed to store authentication token');
+      console.error('Failed to clear refresh token:', error);
     }
   }
 
   /**
-   * Remove authentication token and refresh token
+   * Subscribe to token refresh completion
    */
-  async clearAuthToken(): Promise<void> {
+  private subscribeTokenRefresh(callback: (token: string) => void): void {
+    this.refreshSubscribers.push(callback);
+  }
+
+  /**
+   * Notify all subscribers when token refresh completes
+   */
+  private onTokenRefreshed(token: string): void {
+    this.refreshSubscribers.forEach(callback => callback(token));
+    this.refreshSubscribers = [];
+  }
+
+  /**
+   * Attempt to refresh the access token
+   */
+  private async refreshAccessToken(): Promise<string | null> {
+    if (this.isRefreshing) {
+      // If already refreshing, wait for it to complete
+      return new Promise((resolve) => {
+        this.subscribeTokenRefresh((token: string) => {
+          resolve(token);
+        });
+      });
+    }
+
+    this.isRefreshing = true;
+
     try {
-      await AsyncStorage.multiRemove(['auth_token', 'refresh_token']);
-      console.log('✅ Auth tokens cleared');
+      const refreshToken = await AsyncStorage.getItem('refresh_token');
+      if (!refreshToken) {
+        console.log('⚠️ No refresh token available');
+        this.isRefreshing = false;
+        return null;
+      }
+
+      console.log('🔄 Attempting to refresh access token...');
+
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        headers: this.defaultHeaders,
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const newAccessToken = data.access_token;
+        
+        // Update Zustand store with new token
+        const { useAppStore } = require('../store');
+        useAppStore.setState({
+          authToken: newAccessToken,
+          isAuthenticated: true,
+        });
+        
+        // Update refresh token if provided
+        if (data.refresh_token) {
+          await AsyncStorage.setItem('refresh_token', data.refresh_token);
+        }
+
+        console.log('✅ Token refreshed successfully, new token:', newAccessToken.substring(0, 20) + '...');
+        this.isRefreshing = false;
+        this.onTokenRefreshed(newAccessToken);
+        return newAccessToken;
+      } else {
+        console.log('❌ Token refresh failed:', response.status);
+        this.isRefreshing = false;
+        
+        // Clear auth state on refresh failure
+        const { useAppStore } = require('../store');
+        useAppStore.setState({
+          authToken: null,
+          isAuthenticated: false,
+          user: null,
+        });
+        
+        await this.clearAuthToken();
+        return null;
+      }
     } catch (error) {
-      console.error('Failed to clear auth tokens:', error);
+      console.error('❌ Token refresh error:', error);
+      this.isRefreshing = false;
+      return null;
     }
   }
 
   /**
    * Build headers with authentication if token exists
    */
-  private async buildHeaders(customHeaders?: HeadersInit): Promise<HeadersInit> {
+  private buildHeaders(customHeaders?: HeadersInit): HeadersInit {
     const headers = { ...this.defaultHeaders, ...customHeaders };
     
-    const token = await this.getAuthToken();
+    const token = this.getAuthToken();
     if (token) {
       (headers as any).Authorization = `Bearer ${token}`;
     }
@@ -124,21 +213,27 @@ class ApiClient {
   }
 
   /**
-   * Generic request method with timeout support
+   * Generic request method with timeout support and automatic token refresh
    */
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryCount: number = 0
   ): Promise<ApiResponse<T>> {
     const REQUEST_TIMEOUT = 30000; // 30 seconds timeout
+    const MAX_RETRIES = 1; // Only retry once for token refresh
 
     try {
       const url = `${this.baseURL}${endpoint}`;
-      const headers = await this.buildHeaders(options.headers);
+      const headers = this.buildHeaders(options.headers);
 
       console.log(`🌐 API ${options.method || 'GET'} ${url}`);
-      if (options.body) {
-        console.log('📤 Request body:', JSON.parse(options.body as string));
+      if (options.body && options.body !== '{}') {
+        try {
+          console.log('📤 Request body:', JSON.parse(options.body as string));
+        } catch (e) {
+          // Ignore parse errors for logging
+        }
       }
 
       // Create abort controller for timeout
@@ -154,6 +249,27 @@ class ApiClient {
 
         clearTimeout(timeoutId);
         console.log(`📥 Response status: ${response.status}`);
+
+        // Handle 401 Unauthorized - attempt token refresh
+        if (response.status === 401 && retryCount < MAX_RETRIES && endpoint !== '/auth/refresh') {
+          console.log('🔐 Unauthorized - attempting token refresh...');
+          
+          const newToken = await this.refreshAccessToken();
+          
+          if (newToken) {
+            // Retry the request with new token
+            console.log('🔄 Retrying request with new token...');
+            return this.request<T>(endpoint, options, retryCount + 1);
+          } else {
+            // Token refresh failed - return unauthorized error
+            return {
+              success: false,
+              error: 'Session expired. Please sign in again.',
+              status: 401,
+            };
+          }
+        }
+
         return this.handleResponse<T>(response);
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
@@ -243,8 +359,8 @@ class ApiClient {
   /**
    * Check if user is authenticated
    */
-  async isAuthenticated(): Promise<boolean> {
-    const token = await this.getAuthToken();
+  isAuthenticated(): boolean {
+    const token = this.getAuthToken();
     return !!token;
   }
 }

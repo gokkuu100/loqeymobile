@@ -25,7 +25,6 @@ class WebSocketClient {
   private maxReconnectAttempts: number = 5;
   private messageHandlers: Map<string, (message: WebSocketMessage) => void> = new Map();
   private isIntentionallyClosed: boolean = false;
-  private token: string | null = null;
 
   constructor(baseUrl: string = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000') {
     // Convert HTTP URL to WS URL
@@ -35,14 +34,85 @@ class WebSocketClient {
   }
 
   /**
+   * Get valid authentication token from Zustand store
+   * Automatically refreshes if expired
+   */
+  private async getValidToken(): Promise<string | null> {
+    try {
+      // Import Zustand store dynamically to avoid circular dependencies
+      const { useAppStore } = require('../store');
+      const { AuthAPI } = require('./auth');
+
+      let token = useAppStore.getState().authToken;
+
+      if (!token) {
+        console.log('[WebSocket] No token in Zustand store');
+        return null;
+      }
+
+      // Check if token is expired or expiring soon
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const expiresAt = payload.exp * 1000;
+        const now = Date.now();
+        const timeUntilExpiry = expiresAt - now;
+
+        // If token expires in less than 1 minute, refresh it
+        if (timeUntilExpiry < 60000) {
+          const isExpired = timeUntilExpiry < 0;
+          console.log(`[WebSocket] Token ${isExpired ? 'expired' : 'expiring soon'} - refreshing...`);
+
+          // Get refresh token from AsyncStorage
+          const refreshToken = await AsyncStorage.getItem('refresh_token');
+          if (!refreshToken) {
+            console.warn('[WebSocket] No refresh token available');
+            return null;
+          }
+
+          // Refresh the token
+          const response = await AuthAPI.refreshToken(refreshToken);
+          if (response.success && response.data) {
+            console.log('✅ [WebSocket] Token refreshed successfully');
+
+            // Update Zustand store with new token
+            useAppStore.setState({
+              authToken: response.data.access_token,
+              isAuthenticated: true,
+            });
+
+            // Update refresh token if provided
+            if (response.data.refresh_token) {
+              await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
+            }
+
+            return response.data.access_token;
+          } else {
+            console.error('[WebSocket] Token refresh failed:', response.error);
+            return null;
+          }
+        }
+
+        // Token is still valid
+        return token;
+      } catch (error) {
+        console.error('[WebSocket] Error parsing token:', error);
+        return null;
+      }
+    } catch (error) {
+      console.error('[WebSocket] Error getting token:', error);
+      return null;
+    }
+  }
+
+  /**
    * Initialize WebSocket connection
    */
   async connect(endpoint: string): Promise<void> {
     try {
-      // Get authentication token (using same key as API client)
-      this.token = await AsyncStorage.getItem('auth_token');
-      if (!this.token) {
-        throw new Error('No authentication token found');
+      // Get valid authentication token from Zustand store (with automatic refresh)
+      const token = await this.getValidToken();
+      if (!token) {
+        throw new Error('No valid authentication token found');
       }
 
       // Close existing connection if any
@@ -53,8 +123,8 @@ class WebSocketClient {
       this.isIntentionallyClosed = false;
 
       // Create WebSocket URL with token
-      const wsUrl = `${this.url}${endpoint}?token=${this.token}`;
-      
+      const wsUrl = `${this.url}${endpoint}?token=${token}`;
+
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
@@ -77,7 +147,12 @@ class WebSocketClient {
 
       this.ws.onclose = (event) => {
         console.log(`[WebSocket] Closed: ${event.code} - ${event.reason}`);
-        
+
+        // Handle authentication errors (403 Forbidden)
+        if (event.code === 1008 || event.reason.includes('403')) {
+          console.log('[WebSocket] Authentication error detected - will refresh token on reconnect');
+        }
+
         // Attempt to reconnect if not intentionally closed
         if (!this.isIntentionallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++;

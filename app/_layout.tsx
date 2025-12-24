@@ -1,6 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useAppStore } from '@/store';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,6 +16,9 @@ export default function RootLayout() {
 
   // Initialize WebSocket at root level (only once)
   useWebSocket({ enabled: isAuthenticated });
+
+  // Initialize push notifications at root level (only once)
+  useNotifications({ enabled: isAuthenticated });
 
   return (
     <SafeAreaProvider>
@@ -37,6 +41,18 @@ export default function RootLayout() {
         <Stack.Screen name="assign-device" options={{ headerShown: false }} />
         <Stack.Screen name="complete-profile" options={{ headerShown: false }} />
         <Stack.Screen name="verify-email" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="screens/NotificationSettingsScreen" 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="screens/NotificationListScreen" 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="screens/HelpAndSupportScreen" 
+          options={{ headerShown: false }} 
+        />
         </Stack>
         <ToastContainer />
         <StatusBar style="auto" />

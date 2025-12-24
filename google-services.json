@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "836836567738",
+    "project_id": "loqeymobile-22f2f",
+    "storage_bucket": "loqeymobile-22f2f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836836567738:android:d350d0c339f9c7c534b083",
+        "android_client_info": {
+          "package_name": "com.princeloqey.loqeymobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3nPtATFg881EW2TfN_MbDz9wjMgrtDbY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

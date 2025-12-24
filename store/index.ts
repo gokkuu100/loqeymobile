@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthAPI } from '../api/auth';
 import { DeviceAPI, Device, DeviceAssignRequest, DeviceAssignResponse } from '../api/devices';
 import { LinkAPI, AccessLink, CreateAccessLinkRequest, AccessLinkResponse, LinksStatsResponse } from '../api/links';
+import { NotificationAPI, NotificationPreferences, NotificationPreferencesResponse } from '../api/notifications';
 import apiClient from '../api/client';
 
 /**
@@ -50,6 +51,7 @@ interface AppStore {
   user: User | null;
   authToken: string | null;
   isAuthenticated: boolean;
+  _hasHydrated: boolean; // Internal flag to track hydration completion
 
   // Device State
   devices: Device[];
@@ -60,6 +62,13 @@ interface AppStore {
   accessLinks: AccessLink[];
   linksLoading: boolean;
   linksStats: LinksStatsResponse | null;
+
+  // Notification Preferences State
+  notificationPreferences: NotificationPreferencesResponse | null;
+  notificationPreferencesLoading: boolean;
+
+  // Notification Count State
+  unreadNotificationCount: number;
 
   // UI State
   isLoading: boolean;
@@ -103,6 +112,15 @@ interface AppStore {
   revokeLink: (linkId: string) => Promise<boolean>;
   updateLinkUsage: (linkId: string, updates: Partial<AccessLink>) => void;
 
+  // Notification Preferences Actions
+  loadNotificationPreferences: () => Promise<void>;
+  updateNotificationPreferences: (preferences: Partial<NotificationPreferences>) => Promise<boolean>;
+
+  // Notification Count Actions
+  loadUnreadNotificationCount: () => Promise<void>;
+  setUnreadNotificationCount: (count: number) => void;
+  incrementUnreadNotificationCount: () => void;
+
   // UI Actions
   addNotification: (type: Notification['type'], message: string) => void;
   clearNotification: (id: string) => void;
@@ -113,18 +131,22 @@ interface AppStore {
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
-      // Initial State
-      user: null,
-      authToken: null,
-      isAuthenticated: false,
-      devices: [],
-      selectedDevice: null,
-      devicesLoading: false,
-      accessLinks: [],
-      linksLoading: false,
-      linksStats: null,
-      isLoading: false,
-      notifications: [],
+    // Initial State
+    user: null,
+    authToken: null,
+    isAuthenticated: false,
+    _hasHydrated: false, // Initialize hydration flag
+    devices: [],
+    selectedDevice: null,
+    devicesLoading: false,
+    accessLinks: [],
+    linksLoading: false,
+    linksStats: null,
+    notificationPreferences: null,
+    notificationPreferencesLoading: false,
+    unreadNotificationCount: 0,
+    isLoading: false,
+    notifications: [],
 
       // Auth Actions
       login: async (email: string, password: string) => {
@@ -143,7 +165,7 @@ export const useAppStore = create<AppStore>()(
             console.log('✅ Login successful, setting user data');
             console.log('🔑 Access token received:', response.data.access_token.substring(0, 20) + '...');
 
-            // Store refresh token in AsyncStorage
+            // Store refresh token in AsyncStorage (access token in Zustand only)
             if (response.data.refresh_token) {
               await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
               console.log('🔄 Refresh token stored');
@@ -155,10 +177,7 @@ export const useAppStore = create<AppStore>()(
               isAuthenticated: true,
             });
 
-            // Verify token is stored in both places
-            const storedToken = await (apiClient as any).getAuthToken();
-            console.log('✅ Token stored in AsyncStorage:', storedToken ? 'YES' : 'NO');
-            console.log('✅ Token in Zustand state:', get().authToken ? 'YES' : 'NO');
+            console.log('✅ Token stored in Zustand state (single source of truth)');
 
             get().addNotification('success', 'Welcome back!');
 
@@ -231,20 +250,22 @@ export const useAppStore = create<AppStore>()(
       },
 
       logout: async () => {
+        console.log('🚪 Initiating logout...');
         try {
           await AuthAPI.logout();
         } catch (error) {
-          console.error('Logout error:', error);
+          console.error('Logout API error:', error);
         }
 
-        // Clear refresh token
+        // Clear refresh token from AsyncStorage
         try {
-          await AsyncStorage.removeItem('refresh_token');
-          console.log('🔄 Refresh token cleared');
+          await apiClient.clearAuthToken();
+          console.log('✅ Refresh token cleared from storage');
         } catch (error) {
           console.error('Error clearing refresh token:', error);
         }
 
+        // Clear all state (including auth token in Zustand)
         set({
           user: null,
           authToken: null,
@@ -252,8 +273,13 @@ export const useAppStore = create<AppStore>()(
           devices: [],
           selectedDevice: null,
           accessLinks: [],
+          linksStats: null,
+          notificationPreferences: null,
+          unreadNotificationCount: 0,
           notifications: [],
         });
+        
+        console.log('✅ Logout complete, state cleared');
       },
 
       loadUserProfile: async () => {
@@ -278,11 +304,11 @@ export const useAppStore = create<AppStore>()(
         try {
           console.log('📱 Loading devices...');
 
-          // Check if token exists before making request
-          const storedToken = await (apiClient as any).getAuthToken();
+          // Debug: Check if token exists in Zustand
           const zustandToken = get().authToken;
-          console.log('🔑 Token check - AsyncStorage:', storedToken ? `${storedToken.substring(0, 20)}...` : 'MISSING!');
-          console.log('🔑 Token check - Zustand:', zustandToken ? `${zustandToken.substring(0, 20)}...` : 'MISSING!');
+          const isAuth = get().isAuthenticated;
+          console.log('🔑 Token check - Zustand token:', zustandToken ? `${zustandToken.substring(0, 20)}...` : 'MISSING!');
+          console.log('🔑 isAuthenticated:', isAuth);
 
           const response = await DeviceAPI.getDevices();
           console.log('📱 Devices response:', response);
@@ -558,6 +584,78 @@ export const useAppStore = create<AppStore>()(
         console.log(`[Store] Updated link ${linkId} usage:`, updates);
       },
 
+      // Notification Preferences Actions
+      loadNotificationPreferences: async () => {
+        set({ notificationPreferencesLoading: true });
+        try {
+          console.log('🔔 Loading notification preferences...');
+          const response = await NotificationAPI.getPreferences();
+
+          if (response.success && response.data) {
+            console.log('✅ Loaded notification preferences');
+            set({
+              notificationPreferences: response.data,
+              notificationPreferencesLoading: false,
+            });
+          } else {
+            set({ notificationPreferencesLoading: false });
+            console.log('⚠️ No notification preferences or error:', response.error);
+          }
+        } catch (error) {
+          set({ notificationPreferencesLoading: false });
+          console.error('❌ Load notification preferences error:', error);
+        }
+      },
+
+      updateNotificationPreferences: async (preferences: Partial<NotificationPreferences>) => {
+        set({ isLoading: true });
+        try {
+          console.log('📝 Updating notification preferences:', preferences);
+          const response = await NotificationAPI.updatePreferences(preferences);
+
+          if (response.success && response.data) {
+            set({
+              isLoading: false,
+              notificationPreferences: response.data,
+            });
+            get().addNotification('success', 'Notification preferences updated!');
+            return true;
+          } else {
+            set({ isLoading: false });
+            get().addNotification('error', response.error || 'Failed to update preferences');
+            return false;
+          }
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('❌ Update notification preferences error:', error);
+          get().addNotification('error', 'Network error. Please try again.');
+          return false;
+        }
+      },
+
+      // Notification Count Actions
+      loadUnreadNotificationCount: async () => {
+        try {
+          console.log('🔔 Loading unread notification count...');
+          const response = await NotificationAPI.getUnreadCount();
+
+          if (response.success && response.data) {
+            console.log('✅ Unread count:', response.data.unread_count);
+            set({ unreadNotificationCount: response.data.unread_count });
+          }
+        } catch (error) {
+          console.error('❌ Load unread count error:', error);
+        }
+      },
+
+      setUnreadNotificationCount: (count: number) => {
+        set({ unreadNotificationCount: count });
+      },
+
+      incrementUnreadNotificationCount: () => {
+        set((state) => ({ unreadNotificationCount: state.unreadNotificationCount + 1 }));
+      },
+
       // Profile Actions
       updateUserProfile: (userData: User) => {
         console.log('📝 Updating user profile in store');
@@ -630,59 +728,68 @@ export const useAppStore = create<AppStore>()(
         authToken: state.authToken,
         isAuthenticated: state.isAuthenticated,
       }),
-      onRehydrateStorage: () => {
-        console.log('🔄 Starting store rehydration...');
-        return async (state, error) => {
-          if (error) {
-            console.error('❌ Store rehydration error:', error);
-            return;
-          }
+            onRehydrateStorage: () => {
+               console.log('🔄 Starting store rehydration...');
+               return async (state, error) => {
+                 try {
+                   if (error) {
+                     console.error('❌ Store rehydration error:', error);
+                     useAppStore.setState({ _hasHydrated: true });
+                     return;
+                   }
 
-          if (state?.authToken) {
-            console.log('✅ Store rehydrated with auth token');
-            
-            // Check if token is expired
-            if (isTokenExpired(state.authToken)) {
-              console.log('⚠️ Token expired, attempting refresh...');
-              
-              // Try to refresh the token
-              const refreshToken = await AsyncStorage.getItem('refresh_token');
-              if (refreshToken) {
-                try {
-                  const response = await AuthAPI.refreshToken(refreshToken);
-                  if (response.success && response.data) {
-                    console.log('✅ Token refreshed successfully');
-                    await apiClient.setAuthToken(response.data.access_token);
-                    // Update store with new token (using set from useAppStore)
-                    useAppStore.setState({
-                      authToken: response.data.access_token,
-                      isAuthenticated: true,
-                    });
-                    return;
-                  }
-                } catch (error) {
-                  console.error('❌ Token refresh failed:', error);
-                }
-              }
-              
-              // Refresh failed - clear auth state
-              console.log('❌ Token refresh failed, clearing auth state');
-              await apiClient.clearAuthToken();
-              useAppStore.setState({
-                authToken: null,
-                isAuthenticated: false,
-                user: null,
-              });
-            } else {
-              // Token is still valid
-              console.log('✅ Token is valid, restoring to apiClient');
-              await apiClient.setAuthToken(state.authToken);
-            }
-          } else {
-            console.log('⚠️ Store rehydrated but no auth token found');
-          }
-        };
-      },
+                   if (state?.authToken) {
+                     console.log('✅ Store rehydrated with auth token');
+
+                     // Check if token is expired
+                     if (isTokenExpired(state.authToken)) {
+                       console.log('⚠️ Token expired, attempting refresh...');
+
+                       // Try to refresh the token
+                       const refreshToken = await AsyncStorage.getItem('refresh_token');
+                       if (refreshToken) {
+                         try {
+                           const response = await AuthAPI.refreshToken(refreshToken);
+                           if (response.success && response.data) {
+                             console.log('✅ Token refreshed successfully on rehydration');
+                             
+                             // Update store with new token
+                             useAppStore.setState({
+                               authToken: response.data.access_token,
+                               isAuthenticated: true,
+                               _hasHydrated: true,
+                             });
+                             return;
+                           }
+                         } catch (error) {
+                           console.error('❌ Token refresh failed on rehydration:', error);
+                         }
+                       }
+
+                       // Refresh failed - clear auth state
+                       console.log('❌ Token refresh failed, clearing auth state');
+                       await apiClient.clearAuthToken();
+                       useAppStore.setState({
+                         authToken: null,
+                         isAuthenticated: false,
+                         user: null,
+                         _hasHydrated: true,
+                       });
+                     } else {
+                       // Token is still valid - mark hydration complete
+                       console.log('✅ Token is valid and loaded from store');
+                       useAppStore.setState({ _hasHydrated: true });
+                     }
+                   } else {
+                     console.log('⚠️ Store rehydrated but no auth token found');
+                     useAppStore.setState({ _hasHydrated: true });
+                   }
+                 } catch (error) {
+                   console.error('❌ Unexpected error during rehydration:', error);
+                   useAppStore.setState({ _hasHydrated: true });
+                 }
+               };
+             },
     }
   )
 );

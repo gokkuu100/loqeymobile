@@ -36,8 +36,75 @@ export default function ProfileScreen() {
     router.push('/screens/ChangePasswordScreen');
   };
 
-  const handlePrivacySettings = () => {
-    router.push('/screens/PrivacySettingsScreen');
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This action cannot be undone. All your data including devices, access links, and delivery records will be permanently deleted.\n\nAre you absolutely sure?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: confirmDeleteAccount,
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteAccount = () => {
+    // Ask for password confirmation
+    Alert.prompt(
+      'Confirm Password',
+      'Please enter your password to confirm account deletion',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async (password) => {
+            if (!password) {
+              Alert.alert('Error', 'Password is required');
+              return;
+            }
+
+            setLoggingOut(true);
+            try {
+              const { default: apiClient } = await import('@/api/client');
+              await apiClient.post('/user/delete-account', {
+                password,
+              });
+
+              Alert.alert(
+                'Account Deleted',
+                'Your account has been permanently deleted. We\'re sorry to see you go.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: async () => {
+                      await logout();
+                      router.replace('/signin');
+                    },
+                  },
+                ]
+              );
+            } catch (error: any) {
+              console.error('❌ Account deletion error:', error);
+              const errorMessage = error?.response?.data?.detail || 'Failed to delete account. Please try again.';
+              Alert.alert('Error', errorMessage);
+            } finally {
+              setLoggingOut(false);
+            }
+          },
+        },
+      ],
+      'secure-text'
+    );
   };
 
   const handleSignOut = () => {
@@ -127,16 +194,34 @@ export default function ProfileScreen() {
           </Text>
           <Ionicons name="chevron-forward" size={20} color={colors.tabIconDefault} />
         </TouchableOpacity>
+      </View>
 
-        <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: colors.card }]}
-          onPress={handlePrivacySettings}
+      {/* Danger Zone */}
+      <View style={styles.section}>
+        <Text style={[styles.dangerZoneTitle, { color: '#ef4444' }]}>
+          Danger Zone
+        </Text>
+        <TouchableOpacity
+          style={[styles.deleteButton, { backgroundColor: colors.card, borderColor: '#ef4444' }]}
+          onPress={handleDeleteAccount}
+          disabled={loggingOut}
         >
-          <Ionicons name="shield-outline" size={24} color={colors.tint} />
-          <Text style={[styles.menuText, { color: colors.text }]}>
-            Privacy & Security
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.tabIconDefault} />
+          {loggingOut ? (
+            <ActivityIndicator color="#ef4444" size="small" />
+          ) : (
+            <>
+              <Ionicons name="trash-outline" size={24} color="#ef4444" />
+              <View style={styles.deleteButtonContent}>
+                <Text style={[styles.deleteButtonTitle, { color: '#ef4444' }]}>
+                  Delete Account
+                </Text>
+                <Text style={[styles.deleteButtonDescription, { color: colors.tabIconDefault }]}>
+                  Permanently delete your account and all data
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.tabIconDefault} />
+            </>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -243,5 +328,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     marginTop: 8,
+  },
+  dangerZoneTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  deleteButtonContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  deleteButtonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  deleteButtonDescription: {
+    fontSize: 12,
   },
 });

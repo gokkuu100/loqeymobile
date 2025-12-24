@@ -5,7 +5,7 @@ import { useAppStore } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     Alert,
     Dimensions,
@@ -32,18 +32,22 @@ export default function HomeScreen() {
   const [deviceListExpanded, setDeviceListExpanded] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isInitializing, setIsInitializing] = useState(true);
+  const hasInitialized = useRef(false);
   
   // Use selectors to prevent unnecessary re-renders from WebSocket updates
   const user = useAppStore((state) => state.user);
   const devices = useAppStore((state) => state.devices);
   const selectedDevice = useAppStore((state) => state.selectedDevice);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const _hasHydrated = useAppStore((state) => state._hasHydrated); // Check hydration status
   const isLoading = useAppStore((state) => state.isLoading);
   const linksStats = useAppStore((state) => state.linksStats);
+  const unreadNotificationCount = useAppStore((state) => state.unreadNotificationCount);
   const setSelectedDevice = useAppStore((state) => state.setSelectedDevice);
   const unlockDevice = useAppStore((state) => state.unlockDevice);
   const loadDevices = useAppStore((state) => state.loadDevices);
   const loadLinksStats = useAppStore((state) => state.loadLinksStats);
+  const loadUnreadNotificationCount = useAppStore((state) => state.loadUnreadNotificationCount);
   const logout = useAppStore((state) => state.logout);
 
   // WebSocket is now managed at root level in _layout.tsx
@@ -51,30 +55,51 @@ export default function HomeScreen() {
 
   // Check authentication and redirect if needed
   useEffect(() => {
+    // Only run once
+    if (hasInitialized.current || !_hasHydrated) {
+      return;
+    }
+    
+    hasInitialized.current = true;
+    
     const initializeAuth = async () => {
-      // Give the store time to rehydrate and validate token
-      // Wait longer to allow for token refresh if needed
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      console.log('✅ Store hydration complete');
       console.log('🔐 Auth check - isAuthenticated:', isAuthenticated);
       
       if (!isAuthenticated) {
         console.log('❌ Not authenticated, redirecting to signin');
-        router.replace('/signin');
+        setIsInitializing(false);
+        
+        // Use setTimeout to ensure router is fully mounted before navigation
+        setTimeout(() => {
+          try {
+            router.replace('/signin');
+          } catch (error) {
+            console.error('❌ Navigation error:', error);
+            // If navigation fails, try again after a longer delay
+            setTimeout(() => {
+              router.replace('/signin');
+            }, 500);
+          }
+        }, 200);
       } else {
         console.log('✅ Authenticated, loading data');
-        // Load initial data
-        await Promise.all([
-          loadDevices(),
-          loadLinksStats()
-        ]);
+        // Load initial data - token should be available now
+        try {
+          await Promise.all([
+            loadDevices(),
+            loadLinksStats(),
+            loadUnreadNotificationCount()
+          ]);
+        } catch (error) {
+          console.error('❌ Error loading initial data:', error);
+        }
+        setIsInitializing(false);
       }
-      
-      setIsInitializing(false);
     };
     
     initializeAuth();
-  }, []);
+  }, [_hasHydrated, isAuthenticated]); // Wait for hydration to complete
 
   // Update current time every 5 seconds to refresh "time ago" displays
   useEffect(() => {
@@ -89,11 +114,12 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated) {
-        console.log('🔄 Home screen focused - reloading devices and stats');
+        console.log('🔄 Home screen focused - reloading devices, stats, and notifications');
         loadDevices();
         loadLinksStats();
+        loadUnreadNotificationCount();
       }
-    }, [isAuthenticated, loadDevices, loadLinksStats])
+    }, [isAuthenticated, loadDevices, loadLinksStats, loadUnreadNotificationCount])
   );
 
   const getGreeting = () => {
@@ -279,13 +305,13 @@ export default function HomeScreen() {
     </Modal>
   );
 
-  // Show loading screen while initializing
-  if (isInitializing) {
+  // Show loading screen while initializing or not authenticated
+  if (isInitializing || !isAuthenticated) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={colors.tint} />
         <Text style={[styles.loadingText, { color: colors.text, marginTop: 16 }]}>
-          Loading...
+          {isInitializing ? 'Loading...' : 'Redirecting...'}
         </Text>
       </View>
     );
@@ -309,12 +335,18 @@ export default function HomeScreen() {
         
         <TouchableOpacity
           style={styles.menuButton}
-          onPress={() => {
-            // TODO: Navigate to notifications screen
-            Alert.alert('Notifications', 'Notifications feature coming soon!');
-          }}
+          onPress={() => router.push('/screens/NotificationListScreen' as any)}
         >
-          <Ionicons name="notifications-outline" size={24} color={colors.text} />
+          <View>
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
+            {unreadNotificationCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.tint }]}>
+                <Text style={styles.badgeText}>
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -1016,5 +1048,21 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
