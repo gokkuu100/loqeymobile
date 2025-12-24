@@ -99,15 +99,16 @@ export default function NotificationListScreen() {
     const handleMarkAllAsRead = async (silent: boolean = false) => {
         try {
             await NotificationAPI.markAsRead();
-            
+
             // Update local state
             setNotifications(prev =>
                 prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
             );
 
-            // Update unread count in store
+            // Fetch fresh unread count from backend
+            const countResponse = await NotificationAPI.getUnreadCount();
             const store = useAppStore.getState();
-            store.setUnreadNotificationCount(0);
+            store.setUnreadNotificationCount(countResponse.data.unread_count);
 
             if (!silent) {
                 Alert.alert('Success', 'All notifications marked as read');
@@ -126,7 +127,7 @@ export default function NotificationListScreen() {
 
         try {
             await NotificationAPI.markAsRead(Array.from(selectedIds));
-            
+
             // Update local state
             setNotifications(prev =>
                 prev.map(n =>
@@ -136,10 +137,10 @@ export default function NotificationListScreen() {
                 )
             );
 
-            // Update unread count
-            const unreadCount = notifications.filter(n => !n.is_read && !selectedIds.has(n.id)).length;
+            // Fetch fresh unread count from backend
+            const countResponse = await NotificationAPI.getUnreadCount();
             const store = useAppStore.getState();
-            store.setUnreadNotificationCount(unreadCount);
+            store.setUnreadNotificationCount(countResponse.data.unread_count);
 
             setSelectedIds(new Set());
             setSelectionMode(false);
@@ -165,7 +166,7 @@ export default function NotificationListScreen() {
                     onPress: async () => {
                         try {
                             await NotificationAPI.deleteNotifications(Array.from(selectedIds));
-                            
+
                             // Remove from local state
                             setNotifications(prev => prev.filter(n => !selectedIds.has(n.id)));
                             setTotal(prev => prev - selectedIds.size);
@@ -205,7 +206,7 @@ export default function NotificationListScreen() {
                     onPress: async () => {
                         try {
                             await NotificationAPI.deleteNotifications();
-                            
+
                             setNotifications([]);
                             setTotal(0);
 
@@ -572,8 +573,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
     },
     unreadItem: {
-        borderLeftWidth: 3,
-        borderLeftColor: '#4CAF50',
+        // Only show unread dot, no border styling
     },
     checkbox: {
         marginRight: 12,

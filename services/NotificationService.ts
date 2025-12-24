@@ -7,11 +7,11 @@ import { NotificationAPI } from '../api/notifications';
 // Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
+    shouldShowAlert: false,      // Don't show banner in foreground
+    shouldPlaySound: true,        // Play sound in foreground
+    shouldSetBadge: true,         // Update badge count
+    shouldShowBanner: false,      // Don't show banner in foreground
+    shouldShowList: true,         // Show in notification center
   }),
 });
 
@@ -30,14 +30,17 @@ class NotificationService {
       const hasPermission = await this.requestPermission();
 
       if (hasPermission) {
-        // Get Expo Push Token and register with backend
-        const token = await this.getToken();
-        if (token) {
-          await this.registerToken(token);
-        }
-
-        // Set up message handlers
+        // Set up message handlers first
         this.setupMessageHandlers();
+
+        // Get and register token in background (non-blocking)
+        this.getToken().then(token => {
+          if (token) {
+            this.registerToken(token).catch(err =>
+              console.warn('⚠️ Token registration failed:', err.message || err)
+            );
+          }
+        }).catch(err => console.warn('⚠️ Failed to get token:', err.message || err));
 
         this.initialized = true;
         console.log('✅ Notification service initialized');
@@ -117,7 +120,7 @@ class NotificationService {
 
       const response = await NotificationAPI.registerToken({
         push_token: pushToken,
-        platform: Platform.OS,
+        platform: Platform.OS as 'ios' | 'android',
         device_info: deviceInfo,
       });
 
@@ -183,21 +186,11 @@ class NotificationService {
    * Handle notification when app is in foreground
    */
   handleNotification(notification: Notifications.Notification): void {
-    const { title, body } = notification.request.content;
-    const data = notification.request.content.data;
+    console.log('📬 Handling foreground notification:', notification.request.content.title);
 
-    // Show alert for foreground notifications
-    Alert.alert(
-      title || 'Notification',
-      body || '',
-      [
-        { text: 'Dismiss', style: 'cancel' },
-        {
-          text: 'View',
-          onPress: () => this.handleNotificationPress(notification),
-        },
-      ]
-    );
+    // The notification will be displayed automatically by the handler
+    // Just log it here for debugging
+    // Note: The setNotificationHandler above controls how foreground notifications are displayed
   }
 
   /**
