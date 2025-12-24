@@ -1,18 +1,23 @@
 import apiClient, { ApiResponse } from './client';
 
 export interface PushTokenRequest {
-  fcm_token: string;
-  device_type: 'ios' | 'android';
-  device_name?: string;
-  app_version?: string;
+  push_token: string;
+  platform: 'ios' | 'android';
+  device_info?: {
+    deviceName?: string;
+    modelName?: string;
+    osName?: string;
+    osVersion?: string;
+    [key: string]: any;
+  };
 }
 
 export interface PushTokenResponse {
   id: string;
   user_id: string;
-  fcm_token: string;
-  device_type: string;
-  device_name?: string;
+  push_token: string;
+  platform: string;
+  device_info?: Record<string, any>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -69,8 +74,8 @@ export class NotificationAPI {
   /**
    * Unregister FCM token from backend
    */
-  static async unregisterToken(fcmToken: string): Promise<ApiResponse<{message: string}>> {
-    return apiClient.delete<{message: string}>(`/notifications/unregister-token/${fcmToken}`);
+  static async unregisterToken(fcmToken: string): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.delete<{ message: string }>(`/notifications/unregister-token/${fcmToken}`);
   }
 
   /**
@@ -95,8 +100,8 @@ export class NotificationAPI {
   static async getHistory(
     skip: number = 0,
     limit: number = 20
-  ): Promise<ApiResponse<{notifications: NotificationHistory[], total: number}>> {
-    return apiClient.get<{notifications: NotificationHistory[], total: number}>(
+  ): Promise<ApiResponse<{ notifications: NotificationHistory[], total: number }>> {
+    return apiClient.get<{ notifications: NotificationHistory[], total: number }>(
       `/notifications/history?skip=${skip}&limit=${limit}`
     );
   }
@@ -104,16 +109,16 @@ export class NotificationAPI {
   /**
    * Get unread notification count
    */
-  static async getUnreadCount(): Promise<ApiResponse<{unread_count: number}>> {
-    return apiClient.get<{unread_count: number}>('/notifications/unread-count');
+  static async getUnreadCount(): Promise<ApiResponse<{ unread_count: number }>> {
+    return apiClient.get<{ unread_count: number }>('/notifications/unread-count');
   }
 
   /**
    * Mark notifications as read
    * If notificationIds is empty, marks all as read
    */
-  static async markAsRead(notificationIds?: string[]): Promise<ApiResponse<{message: string}>> {
-    return apiClient.post<{message: string}>('/notifications/mark-read', {
+  static async markAsRead(notificationIds?: string[]): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.post<{ message: string }>('/notifications/mark-read', {
       notification_ids: notificationIds || null
     });
   }
@@ -122,8 +127,8 @@ export class NotificationAPI {
    * Delete notifications (soft delete)
    * If notificationIds is empty, deletes all
    */
-  static async deleteNotifications(notificationIds?: string[]): Promise<ApiResponse<{message: string}>> {
-    return apiClient.delete<{message: string}>('/notifications/delete', {
+  static async deleteNotifications(notificationIds?: string[]): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.delete<{ message: string }>('/notifications/delete', {
       data: { notification_ids: notificationIds || null }
     });
   }
@@ -131,8 +136,8 @@ export class NotificationAPI {
   /**
    * Send test notification
    */
-  static async sendTestNotification(): Promise<ApiResponse<{message: string}>> {
-    return apiClient.post<{message: string}>('/notifications/test');
+  static async sendTestNotification(): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.post<{ message: string }>('/notifications/test');
   }
 }
 

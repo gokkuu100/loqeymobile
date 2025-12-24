@@ -1,57 +1,36 @@
-import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import { Platform, Alert } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { NotificationAPI } from '../api/notifications';
 
-// Check if Firebase is available (not available in Expo Go)
-let messaging: any = null;
-let FirebaseMessagingTypes: any = null;
-
-try {
-  const firebaseMessaging = require('@react-native-firebase/messaging');
-  messaging = firebaseMessaging.default;
-  FirebaseMessagingTypes = firebaseMessaging;
-} catch (error) {
-  console.warn('⚠️ Firebase Messaging not available (likely running in Expo Go). Push notifications will be disabled.');
-}
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 class NotificationService {
   private initialized = false;
-  private isFirebaseAvailable = false;
+  private notificationListener: Notifications.Subscription | null = null;
+  private responseListener: Notifications.Subscription | null = null;
 
   /**
-   * Check if Firebase is available
-   */
-  private checkFirebaseAvailability(): boolean {
-    if (this.isFirebaseAvailable) return true;
-    
-    try {
-      if (messaging && typeof messaging === 'function') {
-        this.isFirebaseAvailable = true;
-        return true;
-      }
-    } catch (error) {
-      // Firebase not available
-    }
-    
-    return false;
-  }
-
-  /**
-   * Initialize Firebase Messaging and request permissions
+   * Initialize Expo Notifications and request permissions
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    // Check if Firebase is available (won't be in Expo Go)
-    if (!this.checkFirebaseAvailability()) {
-      console.warn('⚠️ Firebase not available. Push notifications disabled. Use development build for full functionality.');
-      return;
-    }
-
     try {
-      const authStatus = await this.requestPermission();
-      
-      if (authStatus) {
-        // Get FCM token and register with backend
+      const hasPermission = await this.requestPermission();
+
+      if (hasPermission) {
+        // Get Expo Push Token and register with backend
         const token = await this.getToken();
         if (token) {
           await this.registerToken(token);
@@ -59,7 +38,7 @@ class NotificationService {
 
         // Set up message handlers
         this.setupMessageHandlers();
-        
+
         this.initialized = true;
         console.log('✅ Notification service initialized');
       } else {
@@ -74,26 +53,26 @@ class NotificationService {
    * Request notification permissions
    */
   async requestPermission(): Promise<boolean> {
-    if (!this.checkFirebaseAvailability()) {
+    if (!Device.isDevice) {
+      console.log('Must use physical device for push notifications');
       return false;
     }
 
     try {
-      if (Platform.OS === 'android') {
-        if (Platform.Version >= 33) {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-          );
-          return granted === PermissionsAndroid.RESULTS.GRANTED;
-        }
-        return true; // No permission needed for Android < 13
-      } else {
-        const authStatus = await messaging().requestPermission();
-        return (
-          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-          authStatus === messaging.AuthorizationStatus.PROVISIONAL
-        );
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
       }
+
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push notification permissions');
+        return false;
+      }
+
+      return true;
     } catch (error) {
       console.error('Failed to request permission:', error);
       return false;
@@ -101,19 +80,25 @@ class NotificationService {
   }
 
   /**
-   * Get FCM token
+   * Get Expo Push Token
    */
   async getToken(): Promise<string | null> {
-    if (!this.checkFirebaseAvailability()) {
-      return null;
-    }
-
     try {
-      const token = await messaging().getToken();
-      console.log('FCM Token:', token);
-      return token;
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+
+      if (!projectId) {
+        console.error('Project ID not found in app config');
+        return null;
+      }
+
+      const token = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
+
+      console.log('Expo Push Token:', token.data);
+      return token.data;
     } catch (error) {
-      console.error('Failed to get FCM token:', error);
+      console.error('Failed to get Expo push token:', error);
       return null;
     }
   }
@@ -121,22 +106,23 @@ class NotificationService {
   /**
    * Register token with backend
    */
-  async registerToken(fcmToken: string): Promise<void> {
+  async registerToken(pushToken: string): Promise<void> {
     try {
-      const deviceType = Platform.OS === 'ios' ? 'ios' : 'android';
-      const deviceName = Platform.OS === 'ios' 
-        ? `iPhone` 
-        : `Android ${Platform.Version}`;
+      const deviceInfo = {
+        deviceName: Device.deviceName || 'Unknown',
+        modelName: Device.modelName || 'Unknown',
+        osName: Device.osName || Platform.OS,
+        osVersion: Device.osVersion || String(Platform.Version),
+      };
 
       const response = await NotificationAPI.registerToken({
-        fcm_token: fcmToken,
-        device_type: deviceType,
-        device_name: deviceName,
-        app_version: '1.0.0', // TODO: Get from app config
+        push_token: pushToken,
+        platform: Platform.OS,
+        device_info: deviceInfo,
       });
 
       if (response.success) {
-        console.log('✅ Token registered with backend');
+        console.log('✅ Expo Push Token registered with backend');
       } else {
         console.error('Failed to register token:', response.error);
       }
@@ -166,71 +152,59 @@ class NotificationService {
    * Setup message handlers for foreground and background
    */
   setupMessageHandlers(): void {
-    if (!this.checkFirebaseAvailability()) {
-      return;
+    // Handle notifications received while app is foregrounded
+    this.notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Foreground notification received:', notification);
+      this.handleNotification(notification);
+    });
+
+    // Handle when user taps on notification
+    this.responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification tapped:', response);
+      this.handleNotificationPress(response.notification);
+    });
+
+    console.log('✅ Notification handlers set up');
+  }
+
+  /**
+   * Clean up listeners
+   */
+  cleanup(): void {
+    if (this.notificationListener) {
+      this.notificationListener.remove();
     }
-
-    // Handle foreground messages
-    messaging().onMessage(async (remoteMessage: any) => {
-      console.log('Foreground message received:', remoteMessage);
-      this.handleNotification(remoteMessage);
-    });
-
-    // Handle background/quit state messages
-    messaging().setBackgroundMessageHandler(async (remoteMessage: any) => {
-      console.log('Background message received:', remoteMessage);
-    });
-
-    // Handle notification opened app from background/quit state
-    messaging().onNotificationOpenedApp((remoteMessage: any) => {
-      console.log('Notification opened app:', remoteMessage);
-      this.handleNotificationPress(remoteMessage);
-    });
-
-    // Handle notification opened app from quit state
-    messaging()
-      .getInitialNotification()
-      .then((remoteMessage: any) => {
-        if (remoteMessage) {
-          console.log('Notification opened app from quit state:', remoteMessage);
-          this.handleNotificationPress(remoteMessage);
-        }
-      });
-
-    // Handle token refresh
-    messaging().onTokenRefresh(async (token: string) => {
-      console.log('Token refreshed:', token);
-      await this.registerToken(token);
-    });
+    if (this.responseListener) {
+      this.responseListener.remove();
+    }
   }
 
   /**
    * Handle notification when app is in foreground
    */
-  handleNotification(remoteMessage: any): void {
-    const { notification, data } = remoteMessage;
+  handleNotification(notification: Notifications.Notification): void {
+    const { title, body } = notification.request.content;
+    const data = notification.request.content.data;
 
-    if (notification) {
-      // Show a local alert (or use a custom in-app notification UI)
-      Alert.alert(
-        notification.title || 'Notification',
-        notification.body || '',
-        [
-          { text: 'Dismiss', style: 'cancel' },
-          {
-            text: 'View',
-            onPress: () => this.handleNotificationPress(remoteMessage),
-          },
-        ]
-      );
-    }
+    // Show alert for foreground notifications
+    Alert.alert(
+      title || 'Notification',
+      body || '',
+      [
+        { text: 'Dismiss', style: 'cancel' },
+        {
+          text: 'View',
+          onPress: () => this.handleNotificationPress(notification),
+        },
+      ]
+    );
   }
 
   /**
    * Handle notification press (navigate based on type)
    */
-  handleNotificationPress(remoteMessage: any): void {
-    const { data } = remoteMessage;
+  handleNotificationPress(notification: Notifications.Notification): void {
+    const data = notification.request.content.data;
 
     if (!data) return;
 
@@ -241,31 +215,31 @@ class NotificationService {
       case 'access_code_unlock':
         // Navigate to delivery history or specific delivery
         if (data.delivery_id) {
-          // TODO: Navigate to delivery details screen
           console.log('Navigate to delivery:', data.delivery_id);
+          // TODO: Implement navigation
         }
         break;
 
       case 'low_battery':
         // Navigate to device details or devices screen
         if (data.device_id) {
-          // TODO: Navigate to device details screen
           console.log('Navigate to device:', data.device_id);
+          // TODO: Implement navigation
         }
         break;
 
       case 'failed_unlock':
         // Navigate to access link or security screen
         if (data.link_id) {
-          // TODO: Navigate to link details screen
           console.log('Navigate to link:', data.link_id);
+          // TODO: Implement navigation
         }
         break;
 
       case 'link_used':
         // Navigate to access links screen
-        // TODO: Navigate to links screen
         console.log('Navigate to links screen');
+        // TODO: Implement navigation
         break;
 
       default:
@@ -277,30 +251,44 @@ class NotificationService {
    * Get notification badge count
    */
   async getBadgeCount(): Promise<number> {
-    if (!this.checkFirebaseAvailability()) {
-      return 0;
-    }
+    return await Notifications.getBadgeCountAsync();
+  }
 
-    if (Platform.OS === 'ios') {
-      try {
-        return await messaging().getInitialNotification() ? 1 : 0;
-      } catch (error) {
-        return 0;
-      }
-    }
-    return 0;
+  /**
+   * Set badge count
+   */
+  async setBadgeCount(count: number): Promise<void> {
+    await Notifications.setBadgeCountAsync(count);
   }
 
   /**
    * Clear notification badge
    */
   async clearBadge(): Promise<void> {
-    if (Platform.OS === 'ios') {
-      // iOS badge clearing would be handled by the backend
-      // via APNs when notifications are read
-    }
+    await Notifications.setBadgeCountAsync(0);
+  }
+
+  /**
+   * Clear all notifications
+   */
+  async clearAllNotifications(): Promise<void> {
+    await Notifications.dismissAllNotificationsAsync();
+  }
+
+  /**
+   * Schedule a local notification (for testing)
+   */
+  async scheduleLocalNotification(title: string, body: string, data: any = {}): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data,
+        sound: true,
+      },
+      trigger: { seconds: 1, type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL },
+    });
   }
 }
 
 export default new NotificationService();
-
